@@ -13,9 +13,9 @@ const {
   askReview,
   printCurlCmd,
   exit,
-} = require("./verify.js");
+} = require("../util/verify.js");
 
-const { transferCreate } = require("./create-cmd.js");
+const { transferCreate } = require("../util/create-cmd.js");
 
 const main = async () => {
  let networkId, chainId, senderAcct, receiverAcct, receiverPublicKey, amount, senderPublicKey, senderPrivateKey;
