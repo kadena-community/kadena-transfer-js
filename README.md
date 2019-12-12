@@ -20,9 +20,9 @@ You can learn more about KDA coin contract [here](https://github.com/kadena-io/c
 - Two EXSTIING accounts
 
 The function takes in the following arguments: 
-- senderAccount
-- ReceiverAccount
-- ReceiverGuard
+- Sender Account
+- Receiver Account
+- Receiver Guard
 - Amount
 
 and requires a signature of the sender Keypair. 
@@ -46,13 +46,13 @@ node transfer-create-online.js
 - Two EXISTING accounts.
 
 The function takes in the following arguments: 
-- senderAccount
-- ReceiverAccount
+- Sender Account
+- Receiver Account
 - Amount 
 
-and requires a signature of the sender Keypair. 
+and requires a signature of the sender keypair. 
 
-You should use this function if you are transferring from a KDA account to an existing KDA account that you're completely sure about.
+You should use this function ONLY IF you are completely sure about the receiver account.
 
 If you want to create the command completely offline, use: 
 ```
