@@ -15,7 +15,7 @@ You can learn more about KDA coin contract [here](https://github.com/kadena-io/c
 
 ### transfer-create
 
-`transfer-create` is executed between:   
+**transfer-create** is executed between:   
 - One EXISTING account and one NON-EXISTING account that will be created by this transaction
 - Two EXSTIING accounts
 
@@ -42,7 +42,7 @@ node transfer-create-online.js
 
 ### transfer
 
-`transfer` is executed between:
+**transfer** is executed between:
 - Two EXISTING accounts.
 
 The function takes in the following arguments: 
