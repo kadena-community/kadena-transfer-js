@@ -139,8 +139,9 @@ async function verifySenderPublicKey(account, key){
 
 async function verifySenderPrivateKey(account, key){
   if (!key) key = await question(`Enter PRIVATE KEY of the sender account, "${account}": `)
-  checkKey(key);
-  return key;
+  checkSecretKey(key);
+  if (key.length===128) return key.slice(0, 64)
+  else return key;
 }
 
 async function verifyProof(proof){
@@ -241,6 +242,14 @@ const is_hexadecimal = (str) => {
 const checkKey = (key) => {
   if (key.length !== 64) {
     exitMessage("Key does not have length of 64")
+  } else if (!is_hexadecimal(key)){
+    exitMessage("Key is not hex string")
+  }
+}
+
+const checkSecretKey = (key) => {
+  if (key.length !== 64 && key.length !== 128) {
+    exitMessage("Key does not have the correct length")
   } else if (!is_hexadecimal(key)){
     exitMessage("Key is not hex string")
   }

@@ -42,7 +42,7 @@ async function runOnlineTransferCreate (node, chainId, senderAcct, receiverAcct,
   senderPrivateKey = await verifySenderPrivateKey(senderAcct, senderPrivateKey);
   await printPreview(transferCreate.local(senderAcct, senderPublicKey, senderPrivateKey, receiverAcct, receiverPublicKey, amount, chainId), host)
   await askContinue();
-  printCurlCmd(transferCreate.send(senderAcct, senderPublicKey, senderPrivateKey, receiverAcct, receiverPublicKey, amount, chainId, networkId));
+  printCurlCmd(transferCreate.send(senderAcct, senderPublicKey, senderPrivateKey, receiverAcct, receiverPublicKey, amount, chainId, networkId), host);
 }
 
 main();
