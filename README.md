@@ -17,7 +17,7 @@ You can learn more about KDA coin contract [here](https://github.com/kadena-io/c
 
 **transfer-create** is executed between:   
 - One EXISTING account and one NON-EXISTING account that will be created by this transaction
-- Two EXSTIING accounts
+- Two EXISTING accounts
 
 The function takes in the following arguments:
 - Sender Account
@@ -60,7 +60,7 @@ node scripts/transfer-offline.js
 ```
 If you want to create the command with account validations and guard checks, use:
 ```
-node scripts/transfer-offline.js
+node scripts/transfer-online.js
 ```
 
 ## Cross Chain Transfer
