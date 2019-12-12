@@ -1,19 +1,19 @@
 {
-  "name": "transfer-kda",
+  "name": "kadena-transfer-js",
   "version": "1.0.0",
-  "description": "Transfer KDA coins",
-  "main": "pact-lang-api.js",
+  "description": "Simple Javascript tools to transfer Kadena coins",
+  "main": "scripts",
   "scripts": {
-    "transfer-online": "node transfer-online.js",
-    "transfer-create-online": "node transfer-create-online.js",
-    "transfer-offline": "node transfer-offline.js",
-    "transfer-create-offline": "node transfer-create-offline.js"
+    "transfer-online": "node ./scripts/transfer-online.js",
+    "transfer-create-online": "node ./scripts/transfer-create-online.js",
+    "transfer-offline": "node ./scripts/transfer-offline.js",
+    "transfer-create-offline": "node ./scripts/transfer-create-offline.js"
   },
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "github.com/kadena-community/kadena-transfer-js"
   },
-  "author": "",
+  "author": "Hee Kyun Yun",
   "license": "UNLICENSED",
   "dependencies": {
     "base64-url": "^2.2.1",
