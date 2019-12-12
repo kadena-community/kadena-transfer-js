@@ -1,4 +1,5 @@
 const {
+  apiHost,
   verifyNetworkId,
   verifyChainId,
   verifySenderAcctOffline,
@@ -8,7 +9,7 @@ const {
   verifySenderPrivateKey,
   askContinue,
   askReview,
-  printCmd,
+  printCurlCmd,
   exit } = require("./verify.js");
 const { transfer } = require("./create-cmd.js");
 
@@ -21,13 +22,14 @@ const main = async () => {
 async function runOfflineTransfer(networkId, chainId, senderAcct, receiverAcct, amount, senderPublicKey, senderPrivateKey) {
   networkId = await verifyNetworkId(networkId);
   chainId = await verifyChainId(chainId);
+  const host = apiHost("{YOUR_NODE}", chainId, networkId)
   senderAcct = await verifySenderAcctOffline(senderAcct);
   receiverAcct = await verifyReceiverAcctOffline(receiverAcct);
   amount = await verifyAmountOffline(senderAcct, receiverAcct, amount);
   await askReview(chainId, senderAcct, receiverAcct, amount);
   senderPublicKey =  await verifySenderPublicKey(senderAcct, senderPublicKey);
   senderPrivateKey = await verifySenderPrivateKey(senderAcct, senderPrivateKey);
-  printCmd(transfer.send(senderAcct, senderPublicKey, senderPrivateKey, receiverAcct, amount, chainId, networkId))
+  printCurlCmd(transfer.send(senderAcct, senderPublicKey, senderPrivateKey, receiverAcct, amount, chainId, networkId), host)
 }
 
 main();

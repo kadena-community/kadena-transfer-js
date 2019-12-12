@@ -1,4 +1,4 @@
-const Pact = require("./pact-lang-api.js");
+const Pact = require("pact-lang-api.js");
 const fetch = require("node-fetch")
 const readline = require('readline');
 const apiHost = (node, networkId, chainId) => `https://${node}/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
@@ -19,13 +19,29 @@ async function verifyNode(server){
 }
 
 async function verifyNetworkId(networkId){
-  if (!networkId) networkId = await question(`Enter NETWORK ID of where this tx will run (press enter if using default, "mainnet03"): `)
-  if (networkId === "") return "mainnet03";
+  if (!networkId) networkId = await question(`Enter NETWORK ID of where this tx will run (press enter if using default, "mainnet01"): `)
+  if (networkId === "") return "mainnet01";
   return networkId;
 }
 
 async function verifyChainId(chainId){
   if (!chainId) chainId = await question(`Enter CHAIN ID of single chain transfer: `)
+  if (chains.indexOf(chainId.toString())===-1){
+    exitMessage("Please Choose from 0 to 9");
+  }
+  return chainId.toString();
+}
+
+async function verifyCurrentChainId(chainId){
+  if (!chainId) chainId = await question(`Enter SOURCE CHAIN ID of cross chain transfer: `)
+  if (chains.indexOf(chainId.toString())===-1){
+    exitMessage("Please Choose from 0 to 9");
+  }
+  return chainId.toString();
+}
+
+async function verifyTargetChainId(chainId){
+  if (!chainId) chainId = await question(`Enter TARGET CHAIN ID of cross chain transfer: `)
   if (chains.indexOf(chainId.toString())===-1){
     exitMessage("Please Choose from 0 to 9");
   }
@@ -48,9 +64,9 @@ function checkAccountName(accountName) {
 async function verifySenderAcctOnline(accountName, chainId, host){
   if (!accountName) accountName = await question("Enter SENDER ACCOUNT: ");
   checkAccountName(accountName);
-  const senderInfo = await getDetails(accountName, chainId, host);
-  if (!senderInfo) exitMessage("SENDER DOES NOT EXIST")
-  return senderInfo;
+  const accountInfo = await getDetails(accountName, chainId, host);
+  if (!accountInfo) exitMessage("SENDER DOES NOT EXIST")
+  return accountInfo;
 }
 
 async function verifyReceiverAcctOffline(accountName){
@@ -59,12 +75,20 @@ async function verifyReceiverAcctOffline(accountName){
   return accountName;
 }
 
-async function verifyReceiverAcctOnline(accountName, chainId, host){
+async function verifyReceiverAcctTransferOnline(accountName, chainId, host){
   if (!accountName) accountName = await question("Enter RECEIVER ACCOUNT: ");
   checkAccountName(accountName);
-  const receiverInfo = await getDetails(accountName, chainId, host);
-  if (!receiverInfo) return {account: accountName, details: false}
-  else return receiverInfo;
+  const accountInfo = await getDetails(accountName, chainId, host);
+  if (!accountInfo) exitMessage("RECEIVER DOES NOT EXIST")
+  return accountInfo;
+}
+
+async function verifyReceiverAcctTransferCreateOnline(accountName, chainId, host){
+  if (!accountName) accountName = await question("Enter RECEIVER ACCOUNT: ");
+  checkAccountName(accountName);
+  const accountInfo = await getDetails(accountName, chainId, host);
+  if (!accountInfo) return {account: accountName, details: false}
+  else return accountInfo;
 }
 
 async function verifyReceiverPublicKeyOffline(account, key){
@@ -119,6 +143,11 @@ async function verifySenderPrivateKey(account, key){
   return key;
 }
 
+async function verifyProof(proof){
+  if (!proof) proof = await question(`Enter SPV PROOF fetched from STEP 2: \n`)
+  return proof;
+}
+
 async function askReview(chainId, senderAcct, receiverAcct, amount, receiverG){
   let answer;
   if (receiverG) answer = await question(`Review Transfer Details: \n\n CHAIN ID: "${chainId}"\n SENDER: "${senderAcct}"\n RECEIVER: "${receiverAcct}"\n RECEIVER GUARD:\n\n"${JSON.stringify(receiverG)}"\n\n AMOUNT: ${amount} KDA\n \nIs the information correct? (y or yes): `)
@@ -146,26 +175,27 @@ async function printPreview(localCmd, host){
   try {
     const preview = await fetch(`${host}/api/v1/local`, mkReq(localCmd));
     const res = await preview.json();
-    const gasOnFailure = res.gas * gasPrice;
-    const gasOnSuccess = gasPrice * gasLimit
+    const gasOnFailure = (res.gas * gasPrice).toFixed(12);
+    const gasOnSuccess = (gasPrice * gasLimit).toFixed(12);
     const view = JSON.stringify(res)
     if (res.result.status === "failure"){
       exitMessage(`\nYour tx will fail with the following details\n\n ${view}\n\nExpected Gas Consumption on Failure is: ${gasOnFailure}\nInvestigate issue and try again!` )
     } else if (res.result.status){
-      console.log(`\nHere's a preview of your TX result! \n\n ${view}\n\nExpected Gas Consumption on Success is: ${gasOnSuccess}`)
+      console.log(`\nHere's a preview of your TX result! \n\n ${view}\n\nExpected Gas Consumption on Success is: ${gasOnSuccess}\nExpected Gas Consumption on Failure is: ${gasOnFailure}`)
     }
   } catch(e){
     exitMessage("\nSorry, Preview failed. \n" + e)
   }
 }
 
-function printCurlCmd(sendCmd){
+function printCurlCmd(sendCmd, host){
   const reqKey = sendCmd.cmds[0].hash
   console.log(`\nHere you go! \n\nSTEP 1) MAKE TRANSFER \n\ncurl -k -X POST -H 'Content-Type:application/json' ${host}/api/v1/send -d '${JSON.stringify(sendCmd)}'\n\nSTEP 2) LOOK UP TX RESULT (You can call this as many times as you want) \n\ncurl -k -X POST -H 'Content-Type:application/json' ${host}/api/v1/listen -d '{"listen": "${reqKey}"}' \n\n`)
 }
 
 function printCmd(sendCmd){
   console.log(`\nHere you go! \n\n${JSON.stringify(sendCmd)} \n\n`);
+  return sendCmd.cmds[0].hash;
 }
 
 async function executeCmd(sendCmd, host){
@@ -251,14 +281,18 @@ module.exports = {
   verifyChainId: verifyChainId,
   verifySenderAcctOnline: verifySenderAcctOnline,
   verifySenderAcctOffline: verifySenderAcctOffline,
-  verifyReceiverAcctOnline: verifyReceiverAcctOnline,
   verifyReceiverAcctOffline: verifyReceiverAcctOffline,
+  verifyReceiverAcctTransferOnline: verifyReceiverAcctTransferOnline,
+  verifyReceiverAcctTransferCreateOnline: verifyReceiverAcctTransferCreateOnline,
   verifyReceiverPublicKeyOnline: verifyReceiverPublicKeyOnline,
   verifyReceiverPublicKeyOffline: verifyReceiverPublicKeyOffline,
   verifyAmountOnline: verifyAmountOnline,
   verifyAmountOffline: verifyAmountOffline,
   verifySenderPublicKey: verifySenderPublicKey,
   verifySenderPrivateKey: verifySenderPrivateKey,
+  verifyCurrentChainId: verifyCurrentChainId,
+  verifyTargetChainId: verifyTargetChainId,
+  verifyProof: verifyProof,
   askReview: askReview,
   askContinue: askContinue,
   printPreview: printPreview,

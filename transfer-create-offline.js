@@ -1,4 +1,5 @@
 const {
+  apiHost,
   verifyNetworkId,
   verifyChainId,
   verifySenderAcctOffline,
@@ -10,7 +11,7 @@ const {
   printPreview,
   askContinue,
   askReview,
-  printCmd,
+  printCurlCmd,
   exit,
 } = require("./verify.js");
 
@@ -25,6 +26,7 @@ const main = async () => {
 async function runOfflineTransferCreate(networkId, chainId, senderAcct, receiverAcct, receiverPublicKey, amount, senderPublicKey, senderPrivateKey) {
   networkId = await verifyNetworkId(networkId);
   chainId = await verifyChainId(chainId);
+  const host = apiHost("{YOUR_NODE}", chainId, networkId)
   senderAcct = await verifySenderAcctOffline(senderAcct);
   receiverAcct = await verifyReceiverAcctOffline(receiverAcct);
   receiverPublicKey = await verifyReceiverPublicKeyOffline(receiverAcct, receiverPublicKey);
@@ -36,7 +38,7 @@ async function runOfflineTransferCreate(networkId, chainId, senderAcct, receiver
   await askReview(chainId, senderAcct, receiverAcct, amount, receiverGuard);
   senderPublicKey =  await verifySenderPublicKey(senderAcct, senderPublicKey);
   senderPrivateKey = await verifySenderPrivateKey(senderAcct, senderPrivateKey);
-  printCmd(transferCreate.send(senderAcct, senderPublicKey, senderPrivateKey, receiverAcct, receiverPublicKey, amount, chainId, networkId))
+  printCurlCmd(transferCreate.send(senderAcct, senderPublicKey, senderPrivateKey, receiverAcct, receiverPublicKey, amount, chainId, networkId), host)
 }
 
 main();

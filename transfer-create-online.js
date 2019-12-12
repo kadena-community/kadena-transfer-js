@@ -3,7 +3,7 @@ const {
   verifyNode,
   verifyChainId,
   verifySenderAcctOnline,
-  verifyReceiverAcctOnline,
+  verifyReceiverAcctTransferCreateOnline,
   verifyReceiverPublicKeyOnline,
   verifyAmountOnline,
   verifySenderPublicKey,
@@ -32,7 +32,7 @@ async function runOnlineTransferCreate (node, chainId, senderAcct, receiverAcct,
   senderInfo = await verifySenderAcctOnline(senderAcct, chainId, host);
   senderDetails = senderInfo.details;
   senderAcct = senderInfo.account;
-  receiverInfo = await verifyReceiverAcctOnline(receiverAcct, chainId, host)
+  receiverInfo = await verifyReceiverAcctTransferCreateOnline(receiverAcct, chainId, host)
   receiverDetails = receiverInfo.details;
   receiverAcct = receiverInfo.account;
   receiverPublicKey = await verifyReceiverPublicKeyOnline(receiverAcct, receiverPublicKey, receiverDetails, chainId, host)
