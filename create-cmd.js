@@ -1,4 +1,4 @@
-const Pact = require("pact-lang-api.js");
+const Pact = require("pact-lang-api");
 const creationTime = () => Math.round((new Date).getTime()/1000)-15;
 
 const transferCode = (sender, receiver, amount) => `(coin.transfer "${sender}" "${receiver}" ${amount})`;

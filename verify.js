@@ -1,4 +1,4 @@
-const Pact = require("pact-lang-api.js");
+const Pact = require("pact-lang-api");
 const fetch = require("node-fetch")
 const readline = require('readline');
 const apiHost = (node, networkId, chainId) => `https://${node}/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
