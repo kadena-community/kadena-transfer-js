@@ -26,7 +26,7 @@ const main = async () => {
 async function runOfflineTransferCreate(networkId, chainId, senderAcct, receiverAcct, receiverPublicKey, amount, senderPublicKey, senderPrivateKey) {
   networkId = await verifyNetworkId(networkId);
   chainId = await verifyChainId(chainId);
-  const host = apiHost("{YOUR_NODE}", chainId, networkId)
+  const host = apiHost("{YOUR_NODE}", networkId, chainId)
   senderAcct = await verifySenderAcctOffline(senderAcct);
   receiverAcct = await verifyReceiverAcctOffline(receiverAcct);
   receiverPublicKey = await verifyReceiverPublicKeyOffline(receiverAcct, receiverPublicKey);
@@ -39,6 +39,7 @@ async function runOfflineTransferCreate(networkId, chainId, senderAcct, receiver
   senderPublicKey =  await verifySenderPublicKey(senderAcct, senderPublicKey);
   senderPrivateKey = await verifySenderPrivateKey(senderAcct, senderPrivateKey);
   printCurlCmd(transferCreate.send(senderAcct, senderPublicKey, senderPrivateKey, receiverAcct, receiverPublicKey, amount, chainId, networkId), host)
+  console.log("Replace {YOUR_NODE} with the node server you'll send to")
 }
 
 main();
