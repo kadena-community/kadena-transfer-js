@@ -191,7 +191,7 @@ async function printPreview(localCmd, host){
 
 function printCurlCmd(sendCmd, host){
   const reqKey = sendCmd.cmds[0].hash
-  console.log(`\nHere you go! \n\nSTEP 1) MAKE TRANSFER \n\ncurl -k -X POST -H 'Content-Type:application/json' ${host}/api/v1/send -d '${JSON.stringify(sendCmd)}'\n\nSTEP 2) LOOK UP TX RESULT (You can call this as many times as you want) \n\ncurl -k -X POST -H 'Content-Type:application/json' ${host}/api/v1/listen -d '{"listen": "${reqKey}"}' \n\n`)
+  console.log(`\nHere you go! \n\nSTEP 1) MAKE TRANSFER \n\ncurl -X POST -H 'Content-Type:application/json' ${host}/api/v1/send -d '${JSON.stringify(sendCmd)}'\n\nSTEP 2) LOOK UP TX RESULT (You can call this as many times as you want) \n\ncurl -X POST -H 'Content-Type:application/json' ${host}/api/v1/listen -d '{"listen": "${reqKey}"}' \n\n`)
 }
 
 function printCmd(sendCmd){
