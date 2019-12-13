@@ -1,4 +1,4 @@
-# Transfer KDA
+# kadena-transfer-js
 
 ## Setup
 
