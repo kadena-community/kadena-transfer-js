@@ -40,12 +40,13 @@ async function verifyCurrentChainId(chainId){
   return chainId.toString();
 }
 
-async function verifyTargetChainId(chainId){
-  if (!chainId) chainId = await question(`Enter TARGET CHAIN ID of cross chain transfer: `)
-  if (chains.indexOf(chainId.toString())===-1){
+async function verifyTargetChainId(chainId, targetChainId){
+  if (!targetChainId) targetChainId = await question(`Enter TARGET CHAIN ID of cross chain transfer: `)
+  if (chainId === targetChainId) exitMessage("Use single chain transfer. You've selected the the same chain as Target Chain")
+  if (chains.indexOf(targetChainId.toString())===-1){
     exitMessage("Please Choose from 0 to 9");
   }
-  return chainId.toString();
+  return targetChainId.toString();
 }
 
 //online, offline
@@ -73,6 +74,25 @@ async function verifyReceiverAcctOffline(accountName){
   if (!accountName) accountName = await question("Enter RECEIVER ACCOUNT: ");
   checkAccountName(accountName);
   return accountName;
+}
+
+async function verifyTargetChainGasPayerOffline(accountName){
+  if (!accountName) accountName = await question("Enter GAS PAYER ACCOUNT IN TARGET CHAIN: ");
+  checkAccountName(accountName);
+  return accountName;
+}
+
+async function verifyTargetChainGasPayerPublicKeyOffline(account, key, chainId){
+  if (!key) key = await question(`Enter PUBLIC KEY of the gas payer account in target chain, ${chainId}, "${account}": `)
+  checkKey(key);
+  return key;
+}
+
+async function verifyTargetChainGasPayerPrivateKeyOffline(account, key, chainId){
+  if (!key) key = await question(`Enter PRIVATE KEY of the gas payer account in target chain, ${chainId}, "${account}": `)
+  checkSecretKey(key);
+  if (key.length===128) return key.slice(0, 64)
+  else return key;
 }
 
 async function verifyReceiverAcctTransferOnline(accountName, chainId, host){
@@ -160,6 +180,17 @@ async function askReview(chainId, senderAcct, receiverAcct, amount, receiverG){
   }
 }
 
+async function askReviewCrossChain(sourceChainId, targetChainId, senderAcct, receiverAcct, amount, receiverG, gasPayerAccount){
+  let answer;
+  if (receiverG) answer = await question(`Review Transfer Details: \n\n SOURCE CHAIN ID: "${sourceChainId}"\n TARGET CHAIN ID: "${targetChainId}"\n SENDER: "${senderAcct}"\n RECEIVER: "${receiverAcct}"\n TARGET CHAIN GAS PAYER: "${gasPayerAccount}"\n RECEIVER GUARD:\n\n"${JSON.stringify(receiverG)}"\n\n AMOUNT: ${amount} KDA\n\nIs the information correct? (y or yes): `)
+  else answer = await question(`Review Transfer Details: \n\n CHAIN ID: "${chainId}"\n SENDER: "${senderAcct}"\n RECEIVER: "${receiverAcct}"\n AMOUNT: ${amount} KDA\n \nIs the information correct? (y or yes): `)
+  if (answer === "y" || answer === "yes") {
+    console.log("")
+  } else {
+    exitMessage("You Cancelled Transfer")
+  }
+}
+
 async function askContinue(){
   const answer = await question(`\nContinue? (y or yes): `);
   if (answer === "y" || answer === "yes") {
@@ -192,6 +223,11 @@ async function printPreview(localCmd, host){
 function printCurlCmd(sendCmd, host){
   const reqKey = sendCmd.cmds[0].hash
   console.log(`\nHere you go! \n\nSTEP 1) MAKE TRANSFER \n\ncurl -X POST -H 'Content-Type:application/json' ${host}/api/v1/send -d '${JSON.stringify(sendCmd)}'\n\nSTEP 2) LOOK UP TX RESULT (You can call this as many times as you want) \n\ncurl -X POST -H 'Content-Type:application/json' ${host}/api/v1/listen -d '{"listen": "${reqKey}"}' \n\n`)
+  return sendCmd.cmds[0].hash;
+}
+
+function printSPV(spvCmd, host){
+  console.log(`\nHere you go! \n\ncurl -X POST -H 'Content-Type:application/json' ${host}/spv -d '${JSON.stringify(spvCmd)}'\n\nContinue after you've fetched the proof on current chain\n`)
 }
 
 function printCmd(sendCmd){
@@ -205,7 +241,7 @@ async function executeCmd(sendCmd, host){
     const res = await fetch(`${host}/api/v1/send`, mkReq(sendCmd));
     const resJSON = await res.json();
     try {
-      console.log("\n Listening For the Respose... \n\n", resJSON)
+      console.log("\n Listening For the Response... \n\n", resJSON)
       const listen = await fetch(`${host}/api/v1/listen`, mkReq({listen: resJSON.requestKeys[0]}));
       const listenJSON = await listen.json();
       console.log("\nHere's your result!! \n\n", resJSON)
@@ -291,6 +327,9 @@ module.exports = {
   verifySenderAcctOnline: verifySenderAcctOnline,
   verifySenderAcctOffline: verifySenderAcctOffline,
   verifyReceiverAcctOffline: verifyReceiverAcctOffline,
+  verifyTargetChainGasPayerOffline: verifyTargetChainGasPayerOffline,
+  verifyTargetChainGasPayerPublicKeyOffline: verifyTargetChainGasPayerPublicKeyOffline,
+  verifyTargetChainGasPayerPrivateKeyOffline: verifyTargetChainGasPayerPrivateKeyOffline,
   verifyReceiverAcctTransferOnline: verifyReceiverAcctTransferOnline,
   verifyReceiverAcctTransferCreateOnline: verifyReceiverAcctTransferCreateOnline,
   verifyReceiverPublicKeyOnline: verifyReceiverPublicKeyOnline,
@@ -303,8 +342,10 @@ module.exports = {
   verifyTargetChainId: verifyTargetChainId,
   verifyProof: verifyProof,
   askReview: askReview,
+  askReviewCrossChain: askReviewCrossChain,
   askContinue: askContinue,
   printPreview: printPreview,
+  printSPV: printSPV,
   printCurlCmd: printCurlCmd,
   printCmd: printCmd,
   executeCmd: executeCmd,

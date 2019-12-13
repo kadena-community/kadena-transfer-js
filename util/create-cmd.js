@@ -85,10 +85,12 @@ function createTransferCrossChainLocalCmd(sender, senderPubKey, senderSecretKey,
 }
 
 //STEP 2
-function createSPVCmd(pactId, targetChain){
+function createSPVCmd(pactId, targetChainId){
+  if (!pactId) console.log("ERR - You don't have pactId")
+  if (!targetChainId) console.log("ERR - You don't have target chain")
   return {
     requestKey: pactId,
-    targetChain: targetChain
+    targetChainId: targetChainId
   }
 }
 

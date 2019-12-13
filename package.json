@@ -7,7 +7,8 @@
     "transfer-online": "node ./scripts/transfer-online.js",
     "transfer-create-online": "node ./scripts/transfer-create-online.js",
     "transfer-offline": "node ./scripts/transfer-offline.js",
-    "transfer-create-offline": "node ./scripts/transfer-create-offline.js"
+    "transfer-create-offline": "node ./scripts/transfer-create-offline.js",
+    "cross-chain-transfer-offline": "node ./scripts/cross-chain-transfer-offline.js"
   },
   "repository": {
     "type": "git",
