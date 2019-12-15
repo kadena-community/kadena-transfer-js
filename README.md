@@ -35,10 +35,15 @@ If you want to create the command completely offline, use:
 ```
 node scripts/transfer-create-offline.js
 ```
+Here's an example screenshot of script.  
+![](img/transfer-create-offline.png)
+
 If you want to create the command with account validations and guard checks, use:
 ```
 node scripts/transfer-create-online.js
 ```
+Here's an example screenshot of script.  
+![](img/transfer-create-online.png)
 
 ### transfer
 
