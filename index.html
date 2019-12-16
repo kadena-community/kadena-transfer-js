@@ -45,7 +45,7 @@
       Pact.fetch.send({
         pactCode: `(coin.transfer-create ${JSON.stringify(fromAccount)} ${JSON.stringify(toAccount)} (read-keyset "ks") ${convertDecimal(amount)})`,
         keyPairs: [{publicKey: fromPub, secretKey: fromPriv, clist: [{name: "coin.GAS", args: []}, {name: "coin.TRANSFER", args: [fromAccount, toAccount, parseFloat(amount)]}]}],
-        meta: Pact.lang.mkMeta(fromAccount, chainId, 0.0000000001, 600, createTime(), 28800),
+        meta: Pact.lang.mkMeta(fromAccount, chainId, 0.00001, 600, createTime(), 28800),
         networkId: getVersion(server),
         envData: {"ks": {"pred": "keys-any", "keys": [toPubKey]}}
       }, `https://` + server + `/chainweb/0.0/${getVersion(server)}/chain/${chainId}/pact`).
@@ -64,7 +64,7 @@
             })
         }).catch((e) => {
           console.log(e)
-          document.getElementById('request-key').textContent = "WRONG INPUTS &#13; jkhadsjhdasjhkdaskjh"
+          document.getElementById('request-key').textContent = "WRONG INPUTS"
         })
     }
 
@@ -72,7 +72,7 @@
       Pact.fetch.send({
         pactCode: `(coin.transfer ${JSON.stringify(fromAccount)} ${JSON.stringify(toAccount)} ${convertDecimal(amount)})`,
         keyPairs: [{publicKey: fromPub, secretKey: fromPriv, clist: [{name: "coin.GAS", args: []}, {name: "coin.TRANSFER", args: [fromAccount, toAccount, parseFloat(amount)]}]}],
-        meta: Pact.lang.mkMeta(fromAccount, chainId, 0.0000000001, 600, createTime(), 28800),
+        meta: Pact.lang.mkMeta(fromAccount, chainId, 0.00001, 600, createTime(), 28800),
         networkId: getVersion(server),
       }, `https://` + server + `/chainweb/0.0/${getVersion(server)}/chain/${chainId}/pact`).
         then(res => {
@@ -118,6 +118,8 @@
         )
       //otherwise do a transfer create
       } else {
+        console.log(document.getElementById('to-pub-key').value)
+        // (fromAccount, toAccount, toPubKey, amount, fromPub, fromPriv, server, chainId)
         transferCreate(
           document.getElementById('from-account').value,
           document.getElementById('to-account').value,

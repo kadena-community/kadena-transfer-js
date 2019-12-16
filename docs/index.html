@@ -4,7 +4,7 @@
     <script src="https://code.jquery.com/jquery-3.1.1.min.js" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
     <script src="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.js"></script>
-    <script src="pact-lang-api-global.min.js"></script>
+    <script src="node_modules/pact-lang-api/pact-lang-api-global.min.js"></script>
     <script>
 
     function convertDecimal(decimal) {
@@ -64,7 +64,7 @@
             })
         }).catch((e) => {
           console.log(e)
-          document.getElementById('request-key').textContent = "WRONG INPUTS &#13; jkhadsjhdasjhkdaskjh"
+          document.getElementById('request-key').textContent = "WRONG INPUTS"
         })
     }
 
@@ -118,6 +118,8 @@
         )
       //otherwise do a transfer create
       } else {
+        console.log(document.getElementById('to-pub-key').value)
+        // (fromAccount, toAccount, toPubKey, amount, fromPub, fromPriv, server, chainId)
         transferCreate(
           document.getElementById('from-account').value,
           document.getElementById('to-account').value,
