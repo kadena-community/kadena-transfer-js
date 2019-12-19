@@ -107,6 +107,7 @@
       //diable button to avoid multiple presses
       document.getElementById('submit-button').disabled = true
       //if no to public key provided to a regular transfer
+
       if (document.getElementById('to-pub-key').value === "") {
         transfer(
           document.getElementById('from-account').value,
@@ -119,21 +120,26 @@
         )
       //otherwise do a transfer create
       } else {
-        console.log(document.getElementById('to-pub-key').value)
-        // (fromAccount, toAccount, toPubKey, amount, fromPub, fromPriv, server, chainId)
-        transferCreate(
-          document.getElementById('from-account').value,
-          document.getElementById('to-account').value,
-          document.getElementById('to-pub-key').value,
-          p.options[p.selectedIndex].value,
-          document.getElementById('amount').value,
-          document.getElementById('from-pub-key').value,
-          document.getElementById('from-priv-key').value,
-          document.getElementById('server').value,
-          // document.getElementById('chain-id').value,
-          e.options[e.selectedIndex].value
-        )
-      }
+        if (document.getElementById('to-pub-key').value.length === 64){
+          console.log(document.getElementById('to-pub-key').value)
+          // (fromAccount, toAccount, toPubKey, amount, fromPub, fromPriv, server, chainId)
+          transferCreate(
+            document.getElementById('from-account').value,
+            document.getElementById('to-account').value,
+            document.getElementById('to-pub-key').value,
+            p.options[p.selectedIndex].value,
+            document.getElementById('amount').value,
+            document.getElementById('from-pub-key').value,
+            document.getElementById('from-priv-key').value,
+            document.getElementById('server').value,
+            // document.getElementById('chain-id').value,
+            e.options[e.selectedIndex].value
+          )
+        } else {
+          document.getElementById('request-key').textContent = "WRONG TO PUB KEY LENGTH"
+        }
+        }
+
     }, false);
 
 
