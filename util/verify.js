@@ -57,8 +57,11 @@ async function verifySenderAcctOffline(accountName){
 }
 
 function checkAccountName(accountName) {
-  if (accountName.length<4) {
-    exitMessage("Account name is at least 4 characters!")
+  if (accountName.length<3) {
+      exitMessage("Account name is too short!")
+  }
+  if (accountName.length>256) {
+    exitMessage("Account name is too long!")
   }
 }
 
