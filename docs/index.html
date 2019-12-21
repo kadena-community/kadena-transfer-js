@@ -41,16 +41,17 @@
       $('.ui.dropdown').dropdown();
     });
 
-    async function transferCreate(fromAccount, toAccount, toPubKey, amount, fromPub, fromPriv, server, chainId){
+    async function transferCreate(fromAccount, toAccount, toPubKey, pred, amount, fromPub, fromPriv, server, chainId){
       Pact.fetch.send({
         pactCode: `(coin.transfer-create ${JSON.stringify(fromAccount)} ${JSON.stringify(toAccount)} (read-keyset "ks") ${convertDecimal(amount)})`,
         keyPairs: [{publicKey: fromPub, secretKey: fromPriv, clist: [{name: "coin.GAS", args: []}, {name: "coin.TRANSFER", args: [fromAccount, toAccount, parseFloat(amount)]}]}],
         meta: Pact.lang.mkMeta(fromAccount, chainId, 0.00001, 600, createTime(), 28800),
         networkId: getVersion(server),
-        envData: {"ks": {"pred": "keys-any", "keys": [toPubKey]}}
+        envData: {"ks": {"pred": pred, "keys": [toPubKey]}}
       }, `https://` + server + `/chainweb/0.0/${getVersion(server)}/chain/${chainId}/pact`).
         then(res => {
           var reqKey = res.requestKeys[0];
+          document.getElementById('info').textContent = `Request Key: ${reqKey}`
           document.getElementById('request-key').textContent = "Status: Pending..."
           //do a listen
           Pact.fetch.listen({ listen: reqKey }, `https://` + server + `/chainweb/0.0/${getVersion(server)}/chain/${chainId}/pact`)
@@ -77,6 +78,7 @@
       }, `https://` + server + `/chainweb/0.0/${getVersion(server)}/chain/${chainId}/pact`).
         then(res => {
           var reqKey = res.requestKeys[0];
+          document.getElementById('info').textContent = `Request Key: ${reqKey}`
           document.getElementById('request-key').textContent = "Status: Pending..."
           //do a listen
           Pact.fetch.listen({ listen: reqKey }, `https://` + server + `/chainweb/0.0/${getVersion(server)}/chain/${chainId}/pact`)
@@ -103,9 +105,11 @@
       event.preventDefault();
       // sel.options[sel.selectedIndex].text
       var e = document.getElementById('values');
+      var p = document.getElementById('predicate');
       //diable button to avoid multiple presses
       document.getElementById('submit-button').disabled = true
       //if no to public key provided to a regular transfer
+
       if (document.getElementById('to-pub-key').value === "") {
         transfer(
           document.getElementById('from-account').value,
@@ -118,20 +122,26 @@
         )
       //otherwise do a transfer create
       } else {
-        console.log(document.getElementById('to-pub-key').value)
-        // (fromAccount, toAccount, toPubKey, amount, fromPub, fromPriv, server, chainId)
-        transferCreate(
-          document.getElementById('from-account').value,
-          document.getElementById('to-account').value,
-          document.getElementById('to-pub-key').value,
-          document.getElementById('amount').value,
-          document.getElementById('from-pub-key').value,
-          document.getElementById('from-priv-key').value,
-          document.getElementById('server').value,
-          // document.getElementById('chain-id').value,
-          e.options[e.selectedIndex].value
-        )
-      }
+        if (document.getElementById('to-pub-key').value.length === 64){
+          console.log(document.getElementById('to-pub-key').value)
+          // (fromAccount, toAccount, toPubKey, amount, fromPub, fromPriv, server, chainId)
+          transferCreate(
+            document.getElementById('from-account').value,
+            document.getElementById('to-account').value,
+            document.getElementById('to-pub-key').value,
+            p.options[p.selectedIndex].value,
+            document.getElementById('amount').value,
+            document.getElementById('from-pub-key').value,
+            document.getElementById('from-priv-key').value,
+            document.getElementById('server').value,
+            // document.getElementById('chain-id').value,
+            e.options[e.selectedIndex].value
+          )
+        } else {
+          document.getElementById('request-key').textContent = "WRONG TO PUB KEY LENGTH"
+        }
+        }
+
     }, false);
 
 
@@ -176,10 +186,19 @@
                 <div class="header">Account name is at least 4 characters</div>
               </div>
             </div>
+            <h4>NOTE: If transfering to an existing account make sure keyset predicate matches creation (default is keys-all)</h4>
             <div id="account-field" class="field">
               <label>TO Public Key (optional but safer)</label>
               <input type="text" id="to-pub-key" placeholder="Enter To Public Key">
             </div>
+            <div id="account-field" class="field">
+              <label>TO Keyset Predicate (only if you filled above)</label>
+            </div>
+            <select class="ui dropdown" id="predicate">
+              <option value="">keyset-predicate</option>
+              <option value="keys-all">key-all</option>
+              <option value="keys-any">keys-any</option>
+            </select>
             <div id="account-field" class="field">
               <label>Amount</label>
               <input type="text" id="amount" placeholder="Enter Your Amount To Transfer">
@@ -192,9 +211,13 @@
               <label>FROM Private Key</label>
               <input type="text" id="from-priv-key" placeholder="Enter From Private Key">
             </div>
+            <div class="res">
+              <h4 id="info"/>
+            </div>
             <div class="result">
               <h4 id="request-key"/>
             </div>
+
           <button id="submit-button" class="ui primary button">Make Transfer</button>
           </form>
 
@@ -231,6 +254,10 @@
 .ui #request-key {
   font-size: 32px;
   margin-bottom: 15px;
+}
+.ui #info {
+  font-size: 32px;
+  margin-bottom: 5px;
 }
 .ui #to-account {
   margin-top: 5px;
