@@ -148,6 +148,7 @@
 <body>
     <div id="main">
       <div class="container">
+          <img src="https://explorer.chainweb.com/static/1lv9xhxyhlqc262kffl55w08ms1cvxsnrv49zhvm0b799dsi0v0i-kadena-k-logo.png" class="center" style="width:60px;height:70px">
           <h1>Kadena Coin Transfer</h1>
           <form id ="kadena-form"class="ui form">
             <div id="node-field" class="field">
@@ -212,6 +213,12 @@
             <div class="result">
               <h4 id="request-key"/>
             </div>
+            <div class=memo>
+              <label>CAUTION! DEPENDING HOW YOU CREATED YOUR KEYS/ACCOUNT YOU MAY NOT BE ABLE TO SEND TO CERTAIN OTHER ACCOUNTS, OR MAY NOT BE ABLE TO RECEIVE FROM CERTAIN ACCOUNTS!</label>
+            </div>
+            <div class=memo>
+              <label>It's recommended to do TWO test transactions to make sure you can send AND receive.</label>
+            </div>        
           <button id="submit-button" class="ui primary button">Make Transfer</button>
           </form>
 
@@ -222,7 +229,13 @@
 .dropdown {
   margin-bottom: 10px;
 }
-
+.memo {
+  text-align: center;
+  color: red;
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 15px;
+}
 .container {
   text-align: center;
   margin-top: 20px;
