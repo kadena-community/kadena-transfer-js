@@ -12,7 +12,7 @@
 ## Easy Transfer using index.html
 
 1. Point web browser to file location of index.html
-2. complete fields for sender and receiver accounts and amount.
+2. Complete fields for sender and receiver accounts and amount.
 
 ## Single Chain Transfer
 
