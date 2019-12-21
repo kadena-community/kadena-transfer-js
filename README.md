@@ -6,7 +6,7 @@
 
  `sudo apt install nodejs`
  
-2. clone repository
+2. Clone repository
 
 `sudo git clone https://github.com/kadena-community/kadena-transfer-js.git`
 ## Easy Transfer using index.html
