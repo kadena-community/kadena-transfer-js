@@ -3,6 +3,12 @@
 ## Setup
 
 - Install Node.js
+ `sudo apt install nodejs`
+ 
+## Easy Transfer using index.html
+
+1. Clone repo
+2. Point web browser to file location of index.html
 
 ## Single Chain Transfer
 
