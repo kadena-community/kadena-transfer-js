@@ -51,6 +51,7 @@
       }, `https://` + server + `/chainweb/0.0/${getVersion(server)}/chain/${chainId}/pact`).
         then(res => {
           var reqKey = res.requestKeys[0];
+          document.getElementById('info').textContent = `Request Key: ${reqKey}`
           document.getElementById('request-key').textContent = "Status: Pending..."
           //do a listen
           Pact.fetch.listen({ listen: reqKey }, `https://` + server + `/chainweb/0.0/${getVersion(server)}/chain/${chainId}/pact`)
@@ -77,6 +78,7 @@
       }, `https://` + server + `/chainweb/0.0/${getVersion(server)}/chain/${chainId}/pact`).
         then(res => {
           var reqKey = res.requestKeys[0];
+          document.getElementById('info').textContent = `Request Key: ${reqKey}`
           document.getElementById('request-key').textContent = "Status: Pending..."
           //do a listen
           Pact.fetch.listen({ listen: reqKey }, `https://` + server + `/chainweb/0.0/${getVersion(server)}/chain/${chainId}/pact`)
@@ -209,9 +211,13 @@
               <label>FROM Private Key</label>
               <input type="text" id="from-priv-key" placeholder="Enter From Private Key">
             </div>
+            <div class="res">
+              <h4 id="info"/>
+            </div>
             <div class="result">
               <h4 id="request-key"/>
             </div>
+
           <button id="submit-button" class="ui primary button">Make Transfer</button>
           </form>
 
@@ -248,6 +254,10 @@
 .ui #request-key {
   font-size: 32px;
   margin-bottom: 15px;
+}
+.ui #info {
+  font-size: 32px;
+  margin-bottom: 5px;
 }
 .ui #to-account {
   margin-top: 5px;
