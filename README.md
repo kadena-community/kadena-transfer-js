@@ -2,13 +2,16 @@
 
 ## Setup
 
-- Install Node.js
+1. Install Node.js
+
  `sudo apt install nodejs`
- 
+2. clone repository
+
+`sudo git clone https://github.com/kadena-community/kadena-transfer-js.git`
 ## Easy Transfer using index.html
 
-1. Clone repo
-2. Point web browser to file location of index.html
+1. Point web browser to file location of index.html
+2. complete fields for sender and receiver accounts and amount.
 
 ## Single Chain Transfer
 
