@@ -216,6 +216,7 @@
          validateInput("from-pub-key", checkKey);
          validateInput("from-account", checkAccountName);
          validateInput("to-account", checkAccountName);
+         validateInput("to-pub-key", checkKey);
          validateInput("amount", checkAmount);
          document.getElementById("server").addEventListener("change", function(event) {
              setSubmitStatus();
