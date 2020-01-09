@@ -85,7 +85,6 @@
      function hideSpinner() {
          //document.getElementById('pending-spinner').setAttribute("class", "ui dimmer");
      }
-
      function clearError() {
          document.getElementById("acct-err").innerText = "";
          document.getElementById("kadena-form").setAttribute("class", "ui form");
@@ -96,26 +95,33 @@
      }
      function hasValue(elId) {
          v = document.getElementById(elId).value;
-         return v && v.length > 0;
+         console.log(elId);
+         if (elId === "from-account") {
+           return v && v.length > 2;
+         } else {
+           return v && v.length === 64
+         }
+
      }
      function setSubmitStatus() {
-         // e = document.getElementById('chain-id');
-         // if ( hasValue('from-account') &&
-         // //      hasValue('to-account') &&
-         // //      hasValue('amount') &&
-         //      hasValue('to-pub-key') &&
-         // //      hasValue('from-priv-key') &&
-         // //      hasValue('server') &&
-         //      e.selectedIndex > 0 ) {
-         //     enableSubmit();
-         // } else {
-         //     disableSubmit();
-         // }
-         enableSubmit();
+         e = document.getElementById('chain-id');
+         console.log(hasValue('from-account'))
+         console.log(hasValue('from-account'))
+         console.log(e.selectedIndex > 0 )
+         if ( hasValue('from-account') &&
+              hasValue('to-pub-key') &&
+              e.selectedIndex > 0 ) {
+              console.log('hia')
+             enableSubmit();
+         } else {
+            console.log('ss')
+             disableSubmit();
+         }
      }
      function validateInput(elemId, checkInput) {
          document.getElementById(elemId).addEventListener('input', function(event) {
              try {
+               console.log('h')
                  enableSubmit();
                  val = event.srcElement.value;
                  clearError();
@@ -125,38 +131,19 @@
                  setSubmitStatus();
              }
              catch(err) {
+               console.log(err)
                  setError(err);
+                 disableSubmit()
              }
          }, false);
      }
      window.addEventListener('load', function (event) {
-         // document.getElementById("server").value = "us-e1.chainweb.com"
-         // validateInput("from-priv-key", checkSecretKey);
-         // validateInput("from-pub-key", checkKey);
-         // validateInput("from-account", checkAccountName);
-         // validateInput("to-account", checkValidPubKey);
-         // validateInput("amount", checkAmount);
-         // document.getElementById("server").addEventListener("change", function(event) {
-         //     setSubmitStatus();
-         // });
-         // document.getElementById("chain-id").addEventListener("change", function(event) {
-         //      console.log('here')
-         //      checkValidPubKey(document.getElementById("to-account").value)
-         //
-         // });
-         setSubmitStatus();
-
+         validateInput("to-pub-key", checkKey);
+         validateInput("from-account", checkAccountName);
+         document.getElementById("chain-id").addEventListener("change", function(event) {
+             setSubmitStatus();
+         });
      }, false);
-
-     document.addEventListener('click', async function (event) {
-         if (!event.target.matches('#submit-button')) return;
-         event.preventDefault();
-         console.log('clicked')
-         document.getElementById('status-box').setAttribute("class", "ui compact message result");
-         document.getElementById('status-message').textContent = "Kadena Address"
-         document.getElementById('request-key').textContent = "nick-cage|0|eQpuaWNrLWNhZ2UKMAozMTg5MzNiYQ=="
-     }, false);
-
 
 
      function toPubLoad(){
@@ -174,6 +161,7 @@
              var textFromFileLoaded = fileLoadedEvent.target.result;
              console.log(textFromFileLoaded)
              document.getElementById("to-pub-key").value = textFromFileLoaded.replace("public: ", "");
+             setSubmitStatus();
          };
          fileReader.readAsText(fileToLoad, "UTF-8");
          if (prevMsg.replace(/\s/g, '').length !== 0 ) {
@@ -191,6 +179,27 @@
        }
      }
 
+     document.addEventListener('click', async function (event) {
+         if (!event.target.matches('#submit-button')) return;
+         event.preventDefault();
+         const cid = document.getElementById('chain-id').value;
+         const network = document.getElementById('network').value;
+         const account = document.getElementById('from-account').value;
+         const server = (network === "mainnet01" ? "us-e1.chainweb.com" : "us1.testnet.chainweb.com")
+         const host = `https://${server}/chainweb/0.0/${network}/chain/${cid}/pact`
+         const localObj = {
+           pactCode: `(coin.details ${JSON.stringify(account)})`,
+           keyPairs: Pact.crypto.genKeyPair(),
+           meta: Pact.lang.mkMeta("fake-name", cid, 0.00001, 600, createTime(), 28800),
+           networkId: network,
+         }
+         const res = await Pact.fetch.local(localObj, host)
+         console.log(res)
+         document.getElementById('status-box').setAttribute("class", "ui compact message result");
+         document.getElementById('status-message').textContent = "Kadena Address"
+         document.getElementById('request-key').textContent = "nick-cage|0|eQpuaWNrLWNhZ2UKMAozMTg5MzNiYQ=="
+     }, false);
+
 
     </script>
 </head>
@@ -199,16 +208,16 @@
         <div class="ui container">
             <img src="https://explorer.chainweb.com/static/1lv9xhxyhlqc262kffl55w08ms1cvxsnrv49zhvm0b799dsi0v0i-kadena-k-logo.png" class="center" style="height:70px">
             <h1>Kadena Address Generator</h1>
-            <div class="ui warning message">
+            <div class="ui message">
                 <div class="header">
-                    Caution
+                    Info
                 </div>
-                This tool is to generate Kadena Addresses for Chainweaver wallet users in the format: account-name|chain-id|checksum
+                This tool is to generate Kadena Addresses for Chainweaver wallet users. Chainweaver will only allow transfers to accounts with this format and the funds will be send to the account name. Kadena Address format: account-name|chain-id|checksum
             </div>
             <form id ="kadena-form"class="ui form">
                 <div class="field">
                     <label>Account Name</label>
-                    <input type="text" id="from-account" placeholder="Enter From Account Name">
+                    <input type="text" id="from-account" placeholder="Enter Account Name">
                 </div>
                 <div class="field">
                     <label>Chain ID</label>
@@ -229,13 +238,19 @@
                 <div id="account-field" class="field">
                     <label>Public Key</label>
                     <div>
-                    <input type="text" id="to-pub-key" placeholder="Enter To Public Key">
+                    <input type="text" id="to-pub-key" placeholder="Enter Public Key">
                   </div>
                   <div>
                     <input id="to-pub-file" type="file" class="ui primary button" onchange="toPubLoad()"/>
-                    <!-- <button class="ui primary button" id="load-to-pub" onclick="loadFileAsText()">Load</button> -->
                   </div>
                 </div>
+                <div class="field">
+                    <label>Network</label>
+                </div>
+                <select class="ui dropdown" id="network">
+                    <option value="mainnet01">mainnet</option>
+                    <option value="testnet04">testnet</option>
+                </select>
             <div id="acct-err" class="ui center error message">
             </div>
 

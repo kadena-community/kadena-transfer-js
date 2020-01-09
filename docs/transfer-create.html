@@ -309,7 +309,7 @@
               var textFromFileLoaded = fileLoadedEvent.target.result;
               var keys = textFromFileLoaded.split("\n");
               document.getElementById("from-pub-key").value = keys[0].replace("public: ", "");
-              document.getElementById("from-priv-key").value = keys[1].replace("private: ", "");
+              document.getElementById("from-priv-key").value = keys[1].replace("secret: ", "");
           };
           fileReader.readAsText(fileToLoad, "UTF-8");
           if (prevMsg.replace(/\s/g, '').length !== 0 ) {

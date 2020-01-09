@@ -28,11 +28,11 @@
           if (!event.target.matches('#gen-button')) return;
           event.preventDefault();
           var kp = Pact.crypto.genKeyPair();
-          var priv = `public: ${kp.publicKey}\nprivate: ${kp.secretKey}`
-          var privName = `private-keypair-${Date.now()}.kda`
+          var id = kp.publicKey.substring(0, 6);
+          var priv = `public: ${kp.publicKey}\nsecret: ${kp.secretKey}`
+          var privName = `private-keypair-${id}.kda`
           var pub = `public: ${kp.publicKey}`
-          var pubName = `public-keypair-${Date.now()}.kda`
-          console.log(Date.now())
+          var pubName = `public-keypair-${id}.kda`
           download(priv, privName, "text/plain;charset=utf-8");
           download(pub, pubName, "text/plain;charset=utf-8");
       }, false);
