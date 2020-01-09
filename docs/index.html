@@ -4,14 +4,54 @@
     <script src="https://code.jquery.com/jquery-3.1.1.min.js" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
     <script src="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.js"></script>
+    <script src="pact-lang-api-global.min.js"></script>
+    <script>
+      function download(data, filename, type) {
+        var file = new Blob([data], {type: type});
+        if (window.navigator.msSaveOrOpenBlob) // IE10+
+            window.navigator.msSaveOrOpenBlob(file, filename);
+        else { // Others
+            var a = document.createElement("a"),
+                    url = URL.createObjectURL(file);
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(function() {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 0);
+        }
+      }
+
+      document.addEventListener('click', async function (event) {
+          if (!event.target.matches('#gen-button')) return;
+          event.preventDefault();
+          var kp = Pact.crypto.genKeyPair();
+          var priv = `public: ${kp.publicKey}\nprivate: ${kp.secretKey}`
+          var privName = `private-keypair-${Date.now()}.kda`
+          var pub = `public: ${kp.publicKey}`
+          var pubName = `public-keypair-${Date.now()}.kda`
+          console.log(Date.now())
+          download(priv, privName, "text/plain;charset=utf-8");
+          download(pub, pubName, "text/plain;charset=utf-8");
+      }, false);
+
+    </script>
 </head>
 <body>
     <div id="main">
       <div class="container">
           <img src="https://explorer.chainweb.com/static/1lv9xhxyhlqc262kffl55w08ms1cvxsnrv49zhvm0b799dsi0v0i-kadena-k-logo.png" class="center" style="height:70px">
           <h1>Kadena Coin Transfer</h1>
-          <a href="transfer-create.html"><button id="submit-button" class="ui primary button">Transfer to a New Account</button></a>
-          <a href="transfer.html"><button id="submit-button" class="ui primary button">Transfer to an Existing Account</button></a>
+          <div>
+            <a href="transfer-create.html"><button id="submit-button" class="ui primary button">Transfer to a New Account</button></a>
+            <a href="transfer.html"><button id="submit-button" class="ui primary button">Transfer to an Existing Account</button></a>
+          </div>
+          <div style="margin-top:10px;">
+            <button id="gen-button" class="ui primary button">Generate KeyPair (saves to file)</button>
+            <a href="address.html"><button id="submit-button" class="ui primary button">Generate Kadena Address</button></a>
+          </div>
     </div>
 </body>
 <style>
@@ -19,6 +59,9 @@
 .container {
   text-align: center;
   margin-top: 20px;
+}
+.field {
+  margin-bottom: 20px;
 }
 </style>
 </html>

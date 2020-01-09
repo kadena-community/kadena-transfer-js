@@ -1,0 +1,334 @@
+<html>
+<head>
+    <title>Kadena Transfer Tool</title>
+    <script src="https://code.jquery.com/jquery-3.1.1.min.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.js"></script>
+    <script src="pact-lang-api-global.min.js"></script>
+    <script>
+
+     // From util/verify.js...make DRY later
+     const is_hexadecimal = (str) => {
+         const regexp = /^[0-9a-fA-F]+$/;
+         if (regexp.test(str)) return true;
+         else return false;
+     }
+
+     const checkKey = (key) => {
+         if (key.length !== 64) {
+             throw "Key does not have length of 64";
+         } else if (!is_hexadecimal(key)){
+             throw "Key is not hex string";
+         }
+         return true;
+     }
+
+     const checkSecretKey = (key) => {
+         if (key.length !== 64 && key.length !== 128) {
+             throw "Key does not have the correct length";
+         } else if (!is_hexadecimal(key)){
+             throw "Key is not hex string";
+         }
+         return true;
+     }
+     function checkAccountName(accountName) {
+         if (accountName.length<3) {
+             throw "Account name is too short!";
+         }
+         if (accountName.length>256) {
+             throw "Account name is too long!";
+         }
+     }
+
+
+     function convertDecimal(decimal) {
+         decimal = decimal.toString();
+         if (decimal.includes('.')) { return decimal }
+         if ((decimal / Math.floor(decimal)) === 1) {
+             decimal = decimal + ".0"
+         }
+         return decimal
+     }
+
+     function createTime() {
+         return Math.round((new Date).getTime()/1000)-15;
+     }
+
+     function getVersion(server) {
+         if (server.includes("testnet")) {
+             return "testnet04"
+         } else {
+             return "mainnet01"
+         }
+     }
+
+     function disableSubmit() {
+         document.getElementById('submit-button').disabled = true;
+     }
+     function enableSubmit() {
+         document.getElementById('submit-button').disabled = false;
+     }
+
+     $(function() {
+         $('.ui.dropdown').dropdown();
+     });
+
+     function showNegativeStatusBox() {
+         document.getElementById('status-box').setAttribute("class", "ui compact negative message result");
+     }
+     function showStatusBox() {
+         document.getElementById('status-box').setAttribute("class", "ui compact message result");
+     }
+     function showSpinner() {
+         //document.getElementById('pending-spinner').setAttribute("class", "ui dimmer active");
+     }
+     function hideSpinner() {
+         //document.getElementById('pending-spinner').setAttribute("class", "ui dimmer");
+     }
+
+     function clearError() {
+         document.getElementById("acct-err").innerText = "";
+         document.getElementById("kadena-form").setAttribute("class", "ui form");
+     }
+     function setError(msg) {
+         document.getElementById("acct-err").innerText = msg;
+         document.getElementById("kadena-form").setAttribute("class", "ui form error");
+     }
+     function hasValue(elId) {
+         v = document.getElementById(elId).value;
+         return v && v.length > 0;
+     }
+     function setSubmitStatus() {
+         // e = document.getElementById('chain-id');
+         // if ( hasValue('from-account') &&
+         // //      hasValue('to-account') &&
+         // //      hasValue('amount') &&
+         //      hasValue('to-pub-key') &&
+         // //      hasValue('from-priv-key') &&
+         // //      hasValue('server') &&
+         //      e.selectedIndex > 0 ) {
+         //     enableSubmit();
+         // } else {
+         //     disableSubmit();
+         // }
+         enableSubmit();
+     }
+     function validateInput(elemId, checkInput) {
+         document.getElementById(elemId).addEventListener('input', function(event) {
+             try {
+                 enableSubmit();
+                 val = event.srcElement.value;
+                 clearError();
+                 if ( val !== null && val !== "" ) {
+                     checkInput(val);
+                 }
+                 setSubmitStatus();
+             }
+             catch(err) {
+                 setError(err);
+             }
+         }, false);
+     }
+     window.addEventListener('load', function (event) {
+         // document.getElementById("server").value = "us-e1.chainweb.com"
+         // validateInput("from-priv-key", checkSecretKey);
+         // validateInput("from-pub-key", checkKey);
+         // validateInput("from-account", checkAccountName);
+         // validateInput("to-account", checkValidPubKey);
+         // validateInput("amount", checkAmount);
+         // document.getElementById("server").addEventListener("change", function(event) {
+         //     setSubmitStatus();
+         // });
+         // document.getElementById("chain-id").addEventListener("change", function(event) {
+         //      console.log('here')
+         //      checkValidPubKey(document.getElementById("to-account").value)
+         //
+         // });
+         setSubmitStatus();
+
+     }, false);
+
+     document.addEventListener('click', async function (event) {
+         if (!event.target.matches('#submit-button')) return;
+         event.preventDefault();
+         console.log('clicked')
+         document.getElementById('status-box').setAttribute("class", "ui compact message result");
+         document.getElementById('status-message').textContent = "Kadena Address"
+         document.getElementById('request-key').textContent = "nick-cage|0|eQpuaWNrLWNhZ2UKMAozMTg5MzNiYQ=="
+     }, false);
+
+
+
+     function toPubLoad(){
+       var prevMsg = document.getElementById("acct-err").innerText;
+       console.log(prevMsg.replace(/\s/g, '').length)
+       var errMsg = "Wrong format. Please upload a .kda public file"
+       try {
+         var fileToLoad = document.getElementById("to-pub-file").files[0];
+         // console.log(fileToLoad);
+         if (fileToLoad.name.substr(fileToLoad.name.length - 4) !== ".kda" || fileToLoad.name.includes("private")) {
+           throw errMsg
+         }
+         var fileReader = new FileReader();
+         fileReader.onload = function(fileLoadedEvent){
+             var textFromFileLoaded = fileLoadedEvent.target.result;
+             console.log(textFromFileLoaded)
+             document.getElementById("to-pub-key").value = textFromFileLoaded.replace("public: ", "");
+         };
+         fileReader.readAsText(fileToLoad, "UTF-8");
+         if (prevMsg.replace(/\s/g, '').length !== 0 ) {
+           setError(prevMsg.replace(`${errMsg} and `, "").replace(`${errMsg} and `, "").replace(`${errMsg} and `, ""));
+         } if (prevMsg === errMsg) {
+           clearError()
+         }
+       } catch (err) {
+         document.getElementById("to-pub-key").value = ""
+         if (prevMsg.replace(/\s/g, '').length !== 0) {
+           setError(`${err} and ${prevMsg}`);
+         } else {
+           setError(err);
+         }
+       }
+     }
+
+
+    </script>
+</head>
+<body>
+    <div id="main">
+        <div class="ui container">
+            <img src="https://explorer.chainweb.com/static/1lv9xhxyhlqc262kffl55w08ms1cvxsnrv49zhvm0b799dsi0v0i-kadena-k-logo.png" class="center" style="height:70px">
+            <h1>Kadena Address Generator</h1>
+            <div class="ui warning message">
+                <div class="header">
+                    Caution
+                </div>
+                This tool is to generate Kadena Addresses for Chainweaver wallet users in the format: account-name|chain-id|checksum
+            </div>
+            <form id ="kadena-form"class="ui form">
+                <div class="field">
+                    <label>Account Name</label>
+                    <input type="text" id="from-account" placeholder="Enter From Account Name">
+                </div>
+                <div class="field">
+                    <label>Chain ID</label>
+                </div>
+                <select class="ui dropdown" id="chain-id">
+                    <option value="">Chain ID</option>
+                    <option value="0">0</option>
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                    <option value="7">7</option>
+                    <option value="8">8</option>
+                    <option value="9">9</option>
+                </select>
+                <div id="account-field" class="field">
+                    <label>Public Key</label>
+                    <div>
+                    <input type="text" id="to-pub-key" placeholder="Enter To Public Key">
+                  </div>
+                  <div>
+                    <input id="to-pub-file" type="file" class="ui primary button" onchange="toPubLoad()"/>
+                    <!-- <button class="ui primary button" id="load-to-pub" onclick="loadFileAsText()">Load</button> -->
+                  </div>
+                </div>
+            <div id="acct-err" class="ui center error message">
+            </div>
+
+            <div>
+                <button id="submit-button" class="ui primary button" disabled >Generate Address</button>
+            </div>
+          </form>
+
+          <div id="status-box" class="ui compact message result hidden">
+              <div id="status-message"></div>
+              <div id="request-key"></div>
+          </div>
+
+    </div>
+</body>
+<style>
+
+.dropdown {
+  margin-bottom: 10px;
+}
+
+.container {
+  text-align: center;
+  margin-top: 20px;
+}
+.result {
+ margin-top: 0px;
+}
+.check-button {
+  margin-top: 15px;
+}
+.ui #server {
+  margin-top: 5px;
+  width: 300px;
+}
+.ui #from-pub-key {
+  margin-top: 5px;
+  width: 300px;
+}
+.ui #to-pub-key {
+  margin-top: 5px;
+  width: 300px;
+}
+.ui #to-account {
+  margin-top: 5px;
+  width: 300px;
+}
+.ui #chain-id {
+  margin-top: 0px;
+  width: 300px;
+}
+.ui #from-account {
+  margin-top: 5px;
+  width: 300px;
+}
+.ui #amount {
+  margin-top: 5px;
+  width: 300px;
+}
+.ui #from-priv-key {
+  margin-top: 5px;
+  width: 300px;
+}
+.ui #question {
+  margin-top: 5px;
+  width: 300px;
+}
+.ui #account {
+  margin-top: 5px;
+  width: 300px;
+}
+.ui #acct-err {
+  margin-top: 5px;
+  width: 300px;
+  margin: auto;
+  font-size: 13px;
+}
+.ui #to-pub-file{
+  width: 300px;
+  height: 40px;
+}
+table#data-table {
+  margin-left:auto;
+  margin-right:auto;
+}
+
+table#data-table th{
+  text-align: center;
+  width: 100px;
+}
+table#data-table td{
+  text-align: center;
+  width: 130px;
+}
+</style>
+</html>

@@ -271,6 +271,40 @@
      }, false);
 
 
+     function PrivLoad(){
+       var prevMsg = document.getElementById("acct-err").innerText;
+       console.log(prevMsg.replace(/\s/g, '').length)
+       var errMsg = "Wrong format. Please upload a .kda private file"
+       try {
+         var fileToLoad = document.getElementById("priv-file").files[0];
+         if (fileToLoad.name.substr(fileToLoad.name.length - 4) !== ".kda" || fileToLoad.name.includes("public")) {
+           throw errMsg
+         }
+         var fileReader = new FileReader();
+         fileReader.onload = function(fileLoadedEvent){
+             var textFromFileLoaded = fileLoadedEvent.target.result;
+             var keys = textFromFileLoaded.split("\n");
+             document.getElementById("from-pub-key").value = keys[0].replace("public: ", "");
+             document.getElementById("from-priv-key").value = keys[1].replace("private: ", "");
+         };
+         fileReader.readAsText(fileToLoad, "UTF-8");
+         if (prevMsg.replace(/\s/g, '').length !== 0 ) {
+           setError(prevMsg.replace(`${errMsg} and `, "").replace(`${errMsg} and `, "").replace(`${errMsg} and `, ""));
+         } if (prevMsg === errMsg) {
+           clearError()
+         }
+       } catch (err) {
+         document.getElementById("from-pub-key").value = ""
+         document.getElementById("from-priv-key").value = ""
+         if (prevMsg.replace(/\s/g, '').length !== 0) {
+           setError(`${err} and ${prevMsg}`);
+         } else {
+           setError(err);
+         }
+       }
+     }
+
+
     </script>
 </head>
 <body>
@@ -322,13 +356,19 @@
                     <input type="text" id="amount" placeholder="Enter Your Amount To Transfer">
                 </div>
                 <div class="field">
-                    <label>FROM Public Key</label>
+                    <label>FROM Keypair</label>
+                    <!-- <label>FROM Public Key</label> -->
                     <input type="text" id="from-pub-key" placeholder="Enter From Public Key">
+                <!-- </div>
+                <div class="field"> -->
+                    <!-- <label>FROM Private Key</label> -->
+                    <div>
+                      <input type="text" id="from-priv-key" placeholder="Enter From Private Key">
+                    </div>
+                    <div>
+                      <input id="priv-file" type="file" class="ui primary button" onchange="PrivLoad()"/>
+                    </div>
                 </div>
-                <div class="field">
-                    <label>FROM Private Key</label>
-                    <input type="text" id="from-priv-key" placeholder="Enter From Private Key">
-            </div>
             <div id="acct-err" class="ui center error message">
             </div>
 
@@ -405,6 +445,10 @@
   width: 300px;
   margin: auto;
   font-size: 13px;
+}
+.ui #priv-file{
+  width: 300px;
+  height: 40px;
 }
 table#data-table {
   margin-left:auto;
