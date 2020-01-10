@@ -7,6 +7,8 @@
     <script src="pact-lang-api-global.min.js"></script>
     <script>
 
+
+
      // From util/verify.js...make DRY later
      const is_hexadecimal = (str) => {
          const regexp = /^[0-9a-fA-F]+$/;
@@ -39,6 +41,31 @@
              throw "Account name is too long!";
          }
      }
+
+
+     var makeCRCTable = function(){
+          var c;
+          var crcTable = [];
+          for(var n =0; n < 256; n++){
+              c = n;
+              for(var k =0; k < 8; k++){
+                  c = ((c&1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1));
+              }
+              crcTable[n] = c;
+          }
+          return crcTable;
+      }
+
+      var crc32 = function(str) {
+          var crcTable = window.crcTable || (window.crcTable = makeCRCTable());
+          var crc = 0 ^ (-1);
+
+          for (var i = 0; i < str.length; i++ ) {
+              crc = (crc >>> 8) ^ crcTable[(crc ^ str.charCodeAt(i)) & 0xFF];
+          }
+
+          return (crc ^ (-1)) >>> 0;
+      };
 
 
      function convertDecimal(decimal) {
@@ -182,11 +209,19 @@
      document.addEventListener('click', async function (event) {
          if (!event.target.matches('#submit-button')) return;
          event.preventDefault();
+         //just in case we have the old error
+         clearError();
+         document.getElementById('status-message').textContent = ""
+         document.getElementById('request-key').textContent = ""
+         document.getElementById('status-box').setAttribute("class", "ui compact message result hidden");
          const cid = document.getElementById('chain-id').value;
          const network = document.getElementById('network').value;
          const account = document.getElementById('from-account').value;
+         const pubKey = document.getElementById('to-pub-key').value;
          const server = (network === "mainnet01" ? "us-e1.chainweb.com" : "us1.testnet.chainweb.com")
          const host = `https://${server}/chainweb/0.0/${network}/chain/${cid}/pact`
+         //if local call fails don't do anything, account does not exist.
+         var acctExists = "n";
          const localObj = {
            pactCode: `(coin.details ${JSON.stringify(account)})`,
            keyPairs: Pact.crypto.genKeyPair(),
@@ -194,10 +229,43 @@
            networkId: network,
          }
          const res = await Pact.fetch.local(localObj, host)
-         console.log(res)
-         document.getElementById('status-box').setAttribute("class", "ui compact message result");
-         document.getElementById('status-message').textContent = "Kadena Address"
-         document.getElementById('request-key').textContent = "nick-cage|0|eQpuaWNrLWNhZ2UKMAozMTg5MzNiYQ=="
+         if (res.result.status === "success") {
+           if (account.indexOf(' ') >= 0) {
+             setError("Accounts that contain spaces cannot be converted to the Kadena Address format")
+             return
+           }
+           if (res.result.data.guard.keys[0] === pubKey) {
+             acctExists = "y";
+           } else {
+             setError("account exists, but provided public key does not match")
+             return
+           }
+           //base 64 encode acct|cid|checksum
+           const checksum = crc32((acctExists + account + cid)).toString(16)
+           document.getElementById('status-box').setAttribute("class", "ui compact message result");
+           document.getElementById('status-message').textContent = "Kadena Address"
+           document.getElementById('request-key').textContent = `${account}|${cid}|${btoa(`${account}|${cid}|${checksum}`)}`
+         } else {
+           if (account !== pubKey) {
+             setError(`This account does not exist on chain ${cid}. To create a Kadena Address for a non-existing account, please use the public key as the account name`)
+             return
+           }
+           const checksum = crc32((acctExists + account + cid)).toString(16)
+           document.getElementById('status-box').setAttribute("class", "ui compact message result");
+           document.getElementById('status-message').textContent = "Kadena Address"
+           document.getElementById('request-key').textContent = `${account}|${cid}|${checksum}`
+         }
+         // var crc32=function(r){for(var a,o=[],c=0;c<256;c++){a=c;for(var f=0;f<8;f++)a=1&a?3988292384^a>>>1:a>>>1;o[c]=a}for(var n=-1,t=0;t<r.length;t++)n=n>>>8^o[255&(n^r.charCodeAt(t))];return(-1^n)>>>0};
+         // console.log((acctExists + account + cid))
+         // console.log(acctExists);
+         // console.log(account)
+         // console.log(cid)
+         //
+         // const checksum = crc32((acctExists + account + cid)).toString(16)
+         // console.log(checksum)
+         // document.getElementById('status-box').setAttribute("class", "ui compact message result");
+         // document.getElementById('status-message').textContent = "Kadena Address"
+         // document.getElementById('request-key').textContent = `${account}|${cid}|${checksum}`
      }, false);
 
 
@@ -251,15 +319,17 @@
                     <option value="mainnet01">mainnet</option>
                     <option value="testnet04">testnet</option>
                 </select>
+
             <div id="acct-err" class="ui center error message">
             </div>
-
             <div>
-                <button id="submit-button" class="ui primary button" disabled >Generate Address</button>
+                <button id="submit-button" class="ui primary button" disabled  style="margin-top:10px" >Generate Address</button>
             </div>
+
+
           </form>
 
-          <div id="status-box" class="ui compact message result hidden">
+          <div id="status-box" class="ui compact message result hidden" style="margin-bottom:10px">
               <div id="status-message"></div>
               <div id="request-key"></div>
           </div>
@@ -323,7 +393,7 @@
   width: 300px;
 }
 .ui #acct-err {
-  margin-top: 5px;
+  margin-top: 20px;
   width: 300px;
   margin: auto;
   font-size: 13px;
