@@ -1,5 +1,6 @@
 <html>
 <head>
+    <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1"/>
     <title>Kadena Transfer Tool</title>
     <script src="https://code.jquery.com/jquery-3.1.1.min.js" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
@@ -122,7 +123,6 @@
      }
      function hasValue(elId) {
          v = document.getElementById(elId).value;
-         console.log(elId);
          if (elId === "from-account") {
            return v && v.length > 2;
          } else {
@@ -132,23 +132,17 @@
      }
      function setSubmitStatus() {
          e = document.getElementById('chain-id');
-         console.log(hasValue('from-account'))
-         console.log(hasValue('from-account'))
-         console.log(e.selectedIndex > 0 )
          if ( hasValue('from-account') &&
               hasValue('to-pub-key') &&
               e.selectedIndex > 0 ) {
-              console.log('hia')
              enableSubmit();
          } else {
-            console.log('ss')
              disableSubmit();
          }
      }
      function validateInput(elemId, checkInput) {
          document.getElementById(elemId).addEventListener('input', function(event) {
              try {
-               console.log('h')
                  enableSubmit();
                  val = event.srcElement.value;
                  clearError();
@@ -158,7 +152,6 @@
                  setSubmitStatus();
              }
              catch(err) {
-               console.log(err)
                  setError(err);
                  disableSubmit()
              }
@@ -175,18 +168,15 @@
 
      function toPubLoad(){
        var prevMsg = document.getElementById("acct-err").innerText;
-       console.log(prevMsg.replace(/\s/g, '').length)
        var errMsg = "Wrong format. Please upload a .kda public file"
        try {
          var fileToLoad = document.getElementById("to-pub-file").files[0];
-         // console.log(fileToLoad);
          if (fileToLoad.name.substr(fileToLoad.name.length - 4) !== ".kda" || fileToLoad.name.includes("private")) {
            throw errMsg
          }
          var fileReader = new FileReader();
          fileReader.onload = function(fileLoadedEvent){
              var textFromFileLoaded = fileLoadedEvent.target.result;
-             console.log(textFromFileLoaded)
              document.getElementById("to-pub-key").value = textFromFileLoaded.replace("public: ", "");
              setSubmitStatus();
          };
@@ -241,31 +231,22 @@
              return
            }
            //base 64 encode acct|cid|checksum
+           console.log(acctExists + account + cid)
            const checksum = crc32((acctExists + account + cid)).toString(16)
            document.getElementById('status-box').setAttribute("class", "ui compact message result");
            document.getElementById('status-message').textContent = "Kadena Address"
-           document.getElementById('request-key').textContent = `${account}|${cid}|${btoa(`${account}|${cid}|${checksum}`)}`
+           document.getElementById('request-key').textContent = `${account}|${cid}|${btoa(`${account}"\n"${cid}"\n"${checksum}`)}`
          } else {
            if (account !== pubKey) {
              setError(`This account does not exist on chain ${cid}. To create a Kadena Address for a non-existing account, please use the public key as the account name`)
              return
            }
+           console.log(acctExists + account + cid)
            const checksum = crc32((acctExists + account + cid)).toString(16)
            document.getElementById('status-box').setAttribute("class", "ui compact message result");
            document.getElementById('status-message').textContent = "Kadena Address"
            document.getElementById('request-key').textContent = `${account}|${cid}|${checksum}`
          }
-         // var crc32=function(r){for(var a,o=[],c=0;c<256;c++){a=c;for(var f=0;f<8;f++)a=1&a?3988292384^a>>>1:a>>>1;o[c]=a}for(var n=-1,t=0;t<r.length;t++)n=n>>>8^o[255&(n^r.charCodeAt(t))];return(-1^n)>>>0};
-         // console.log((acctExists + account + cid))
-         // console.log(acctExists);
-         // console.log(account)
-         // console.log(cid)
-         //
-         // const checksum = crc32((acctExists + account + cid)).toString(16)
-         // console.log(checksum)
-         // document.getElementById('status-box').setAttribute("class", "ui compact message result");
-         // document.getElementById('status-message').textContent = "Kadena Address"
-         // document.getElementById('request-key').textContent = `${account}|${cid}|${checksum}`
      }, false);
 
 
@@ -276,11 +257,13 @@
         <div class="ui container">
             <img src="https://explorer.chainweb.com/static/1lv9xhxyhlqc262kffl55w08ms1cvxsnrv49zhvm0b799dsi0v0i-kadena-k-logo.png" class="center" style="height:70px">
             <h1>Kadena Address Generator</h1>
-            <div class="ui message">
+            <div class="ui message warning">
                 <div class="header">
-                    Info
+                    Caution
                 </div>
-                This tool is to generate Kadena Addresses for Chainweaver wallet users. Chainweaver will only allow transfers to accounts with this format and the funds will be send to the account name. Kadena Address format: account-name|chain-id|checksum
+                This tool is to generate Kadena Addresses for Chainweaver wallet users.
+                <div>Chainweaver will only allow transfers to accounts with this format and the funds will be sent to the account name.</div>
+                <div>DO NOT USE KADENA ADDRESS OUTSIDE OF CHAINWEAVER WALLET</div>
             </div>
             <form id ="kadena-form"class="ui form">
                 <div class="field">
