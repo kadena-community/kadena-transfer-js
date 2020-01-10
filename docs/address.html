@@ -224,25 +224,29 @@
              setError("Accounts that contain spaces cannot be converted to the Kadena Address format")
              return
            }
+           console.log(res.result.data.guard.keys[0])
+           console.log(pubKey)
            if (res.result.data.guard.keys[0] === pubKey) {
+
              acctExists = "y";
            } else {
              setError("account exists, but provided public key does not match")
              return
            }
+
+           const checksum = crc32((acctExists + account + `\"${cid}\"`)).toString(16)
            //base 64 encode acct|cid|checksum
-           console.log(acctExists + account + cid)
-           const checksum = crc32((acctExists + account + cid)).toString(16)
+           const b64 = btoa(`${acctExists}\n${account}\n${cid}\n${checksum}`)
+           console.log(b64)
            document.getElementById('status-box').setAttribute("class", "ui compact message result");
            document.getElementById('status-message').textContent = "Kadena Address"
-           document.getElementById('request-key').textContent = `${account}|${cid}|${btoa(`${account}"\n"${cid}"\n"${checksum}`)}`
+           document.getElementById('request-key').textContent = `${account}|${cid}|${b64}`
          } else {
            if (account !== pubKey) {
              setError(`This account does not exist on chain ${cid}. To create a Kadena Address for a non-existing account, please use the public key as the account name`)
              return
            }
-           console.log(acctExists + account + cid)
-           const checksum = crc32((acctExists + account + cid)).toString(16)
+           const checksum = crc32((acctExists + account + `\"${cid}\"`)).toString(16)
            document.getElementById('status-box').setAttribute("class", "ui compact message result");
            document.getElementById('status-message').textContent = "Kadena Address"
            document.getElementById('request-key').textContent = `${account}|${cid}|${checksum}`
