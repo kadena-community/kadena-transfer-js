@@ -33,7 +33,9 @@
      }
 
      const checkSignature = (sig) => {
-       //ADD VERIFICATION
+       if (key.length !== 128) {
+         throw "Sig does not have the correct length";
+       }
        return true;
      }
 
