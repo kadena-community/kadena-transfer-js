@@ -31,6 +31,12 @@
          }
          return true;
      }
+
+     const checkSignature = (sig) => {
+       //ADD VERIFICATION
+       return true;
+     }
+
      function checkAccountName(accountName) {
          if (accountName.length<3) {
              throw "Account name is too short!";
@@ -61,12 +67,22 @@
          return Math.round((new Date).getTime()/1000)-15;
      }
 
-     function getVersion(server) {
+     function getVersion1(server) {
+
          if (server.includes("testnet")) {
              return "testnet04"
          } else {
              return "mainnet01"
          }
+     }
+     async function getVersion(server){
+       try {
+         const nodeInfo = await fetch(`https://${server}/info`);
+         const nodeInfoJSON = await nodeInfo.json();
+         return nodeInfoJSON.nodeVersion;
+       } catch(e){
+         console.log(e)
+       }
      }
 
      function disableSubmit() {
@@ -100,10 +116,12 @@
      };
 
      const sendNonJson = async function(sendCmd, apiHost){
-         if (!apiHost)  throw new Error(`Pact.fetch.send(): No apiHost provided`);
-         const c = Pact.api.prepareExecCmd( sendCmd.keyPairs, sendCmd.nonce, sendCmd.pactCode,
+        if (!apiHost)  throw new Error(`Pact.fetch.send(): No apiHost provided`);
+        var c = Pact.simple.exec.createCommand( sendCmd.keyPairs, sendCmd.nonce, sendCmd.pactCode,
                                             sendCmd.envData, sendCmd.meta, sendCmd.networkId);
-         const txRes = await fetch(`${apiHost}/api/v1/send`, mkReq(Pact.api.mkPublicSend([c])));
+        if (document.getElementById("select-signature").value === "signature")  c = JSON.parse(JSON.stringify(c).replace("REPLACE THIS WITH SIGNATURE", sendCmd.signature))
+        console.log(c)
+         const txRes = await fetch(`${apiHost}/api/v1/send`, mkReq(c));
          return txRes;
      };
 
@@ -119,19 +137,21 @@
      function hideSpinner() {
          //document.getElementById('pending-spinner').setAttribute("class", "ui dimmer");
      }
-     async function transferCreate(fromAccount, toAccount, toPubKey, pred, amount, fromPub, fromPriv, server, chainId){
+     async function transferCreate(fromAccount, toAccount, toPubKey, pred, amount, fromPub, fromPriv, server, chainId, signature){
          //diable button to avoid multiple presses
          disableSubmit();
          m = Pact.lang.mkMeta(fromAccount, chainId, 0.00001, 600, createTime(), 28800);
          console.log(m);
+         const networkId = await getVersion(server)
          sendObj = {
              pactCode: `(coin.transfer-create ${JSON.stringify(fromAccount)} ${JSON.stringify(toAccount)} (read-keyset "ks") ${convertDecimal(amount)})`,
              keyPairs: [{publicKey: fromPub, secretKey: fromPriv, clist: [{name: "coin.GAS", args: []}, {name: "coin.TRANSFER", args: [fromAccount, toAccount, parseFloat(amount)]}]}],
              meta: m,
-             networkId: getVersion(server),
-             envData: {"ks": {"pred": pred, "keys": [toPubKey]}}
+             networkId: networkId,
+             envData: {"ks": {"pred": pred, "keys": [toPubKey]}},
+             signature: signature
          };
-         host = `https://` + server + `/chainweb/0.0/${getVersion(server)}/chain/${chainId}/pact`;
+         host = `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
          handleResult = async function(res) {
              foo = await res;
              hideSpinner();
@@ -143,7 +163,7 @@
                  document.getElementById('request-key').textContent = "Request Key: " + reqKey;
                  showSpinner();
                  //do a listen
-                 Pact.fetch.listen({ listen: reqKey }, `https://` + server + `/chainweb/0.0/${getVersion(server)}/chain/${chainId}/pact`)
+                 Pact.fetch.listen({ listen: reqKey }, `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`)
                      .then(res => {
                          if (res.result.status === "success") {
                              document.getElementById('status-message').textContent = "TRANSFER SUCCEEDED"
@@ -180,20 +200,23 @@
          v = document.getElementById(elId).value;
          return v && v.length > 0;
      }
+
      function setSubmitStatus() {
          e = document.getElementById('chain-id');
+         s = document.getElementById('select-signature')
          if ( hasValue('from-account') &&
               hasValue('to-account') &&
               hasValue('amount') &&
               hasValue('from-pub-key') &&
-              hasValue('from-priv-key') &&
               hasValue('server') &&
+              s.selectedIndex > 0 &&
               e.selectedIndex > 0 ) {
              enableSubmit();
          } else {
              disableSubmit();
          }
      }
+
      function validateInput(elemId, checkInput) {
          document.getElementById(elemId).addEventListener('input', function(event) {
              try {
@@ -201,22 +224,24 @@
                  val = event.srcElement.value;
                  clearError();
                  if ( val !== null && val !== "" ) {
-                     checkInput(val);
+                   checkInput(val)
                  }
                  setSubmitStatus();
              }
              catch(err) {
-                 setError(err);
+               disableSubmit();
+               setError(err);
              }
          }, false);
      }
+
      window.addEventListener('load', function (event) {
          document.getElementById("server").value = "us-e1.chainweb.com"
-         validateInput("from-priv-key", checkSecretKey);
+         document.getElementById("networkId").value = "mainnet01"
          validateInput("from-pub-key", checkKey);
          validateInput("from-account", checkAccountName);
          validateInput("to-account", checkAccountName);
-         validateInput("to-pub-key", checkKey);
+         validateInput("to-pub-key", checkSecretKey);
          validateInput("amount", checkAmount);
          document.getElementById("server").addEventListener("change", function(event) {
              setSubmitStatus();
@@ -224,18 +249,31 @@
          document.getElementById("chain-id").addEventListener("change", function(event) {
              setSubmitStatus();
          });
+         document.getElementById("select-signature").addEventListener("change", function(event) {
+           if (event.target.value === "signature") validateInput("from-signature", checkSignature);
+           if (event.target.value === "privKey") validateInput("from-priv-key", checkSecretKey);
+           setSubmitStatus();
+         });
      }, false);
 
+     var selectSig = function(){
+       const inputDiv = document.getElementById("signature-input")
+       const sigOption = document.getElementById("select-signature").value;
+       if (sigOption === "signature") inputDiv.innerHTML = `<input type="text" id="from-signature" placeholder="Enter Signature">`
+       else if (sigOption === "privKey") inputDiv.innerHTML = `<div><input type="text" id="from-priv-key" placeholder="Enter From Private Key"></div><div><input id="priv-file" type="file" class="ui primary button" onchange="PrivLoad()"/></div>`
+     }
+
+     //SUBMIT TRANSACTION
      document.addEventListener('click', async function (event) {
          if (!event.target.matches('#submit-button')) return;
          event.preventDefault();
          // sel.options[sel.selectedIndex].text
          var e = document.getElementById('chain-id');
          var p = document.getElementById('predicate');
-         var rawPriv = document.getElementById('from-priv-key').value;
+         var rawPriv = document.getElementById('from-priv-key')? document.getElementById('from-priv-key').value : null;
          if (rawPriv.length===128) priv = rawPriv.slice(0, 64);
          else priv = rawPriv;
-
+         var sig =  document.getElementById('from-signature') ? document.getElementById('from-signature') : null
          transferCreate(
              document.getElementById('from-account').value,
              document.getElementById('to-account').value,
@@ -245,22 +283,18 @@
              document.getElementById('from-pub-key').value,
              priv,
              document.getElementById('server').value,
-             e.options[e.selectedIndex].value
+             e.options[e.selectedIndex].value,
+             sig
          )
 
      }, false);
 
      function loadFileAsText(){
-
-
-
         fileReader.onload = function(fileLoadedEvent){
             var textFromFileLoaded = fileLoadedEvent.target.result;
             console.log(textFromFileLoaded)
             // document.getElementById("inputTextToSave").value = textFromFileLoaded;
         };
-
-
       }
 
       function toPubLoad(){
@@ -346,11 +380,23 @@
                 send those coins back to the sender to verify that the receiver's
                 account works as expected.
             </div>
+            <!-- <div class="ui secondary  menu">
+              <a class="active item">
+                Online
+              </a>
+              <a class="item">
+                Offline
+              </a>
+            </div> -->
             <form id ="kadena-form"class="ui form">
                 <div class="field">
                     <label>Chainweb Server</label>
                     <input type="text" id="server" placeholder="Enter Your Node Server">
                 </div>
+                <!-- <div class="field">
+                    <label>Network ID</label>
+                    <input type="text" id="networkId" placeholder="Enter NetworkId">
+                </div> -->
                 <div class="field">
                     <label>Chain ID</label>
                 </div>
@@ -379,12 +425,12 @@
                 <div id="account-field" class="field">
                     <label>TO Public Key</label>
                     <div>
-                    <input type="text" id="to-pub-key" placeholder="Enter To Public Key">
-                  </div>
-                  <div>
-                    <input id="to-pub-file" type="file" class="ui primary button" onchange="toPubLoad()"/>
-                    <!-- <button class="ui primary button" id="load-to-pub" onclick="loadFileAsText()">Load</button> -->
-                  </div>
+                      <input type="text" id="to-pub-key" placeholder="Enter To Public Key">
+                    </div>
+                    <div>
+                      <input id="to-pub-file" type="file" class="ui primary button" onchange="toPubLoad()"/>
+                      <!-- <button class="ui primary button" id="load-to-pub" onclick="loadFileAsText()">Load</button> -->
+                    </div>
                 </div>
                 <div id="account-field" class="field">
                     <label>TO Keyset Predicate</label>
@@ -399,22 +445,26 @@
                     <input type="text" id="amount" placeholder="Enter Your Amount To Transfer">
                 </div>
                 <div class="field">
-                    <label>FROM Keypair</label>
+                    <label>FROM Public Key</label>
                     <!-- <label>FROM Public Key</label> -->
                     <input type="text" id="from-pub-key" placeholder="Enter From Public Key">
                 <!-- </div>
                 <div class="field"> -->
                     <!-- <label>FROM Private Key</label> -->
-                    <div>
-                      <input type="text" id="from-priv-key" placeholder="Enter From Private Key">
-                    </div>
-                    <div>
-                      <input id="priv-file" type="file" class="ui primary button" onchange="PrivLoad()"/>
-                    </div>
                 </div>
+                <div>
+                  <div id="signature-field" class="field">
+                      <label>FROM SIGN (Private Key or Signature)</label>
+                  </div>
+                  <select type="text" class="ui dropdown" id="select-signature" placeholder="Options to Sign" onchange="selectSig()">
+                    <option value="">Pick Signing Option</option>
+                    <option value="privKey">Private Key</option>
+                    <option value="signature">Signature</option>
+                  </select>
+                </div>
+                <div class="field" id="signature-input"></div>
             <div id="acct-err" class="ui center error message">
             </div>
-
             <div>
                 <button id="submit-button" class="ui primary button" disabled >Make Transfer</button>
             </div>
@@ -447,6 +497,10 @@
   margin-top: 5px;
   width: 300px;
 }
+.ui #networkId {
+  margin-top: 5px;
+  width: 200px;
+}
 .ui #from-pub-key {
   margin-top: 5px;
   width: 300px;
@@ -463,6 +517,10 @@
   margin-top: 0px;
   width: 300px;
 }
+.ui #select-signature {
+  margin-top: 0px;
+  width: 300px;
+}
 .ui #from-account {
   margin-top: 5px;
   width: 300px;
@@ -472,6 +530,10 @@
   width: 300px;
 }
 .ui #from-priv-key {
+  margin-top: 5px;
+  width: 300px;
+}
+.ui #from-signature {
   margin-top: 5px;
   width: 300px;
 }
