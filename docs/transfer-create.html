@@ -237,7 +237,7 @@
 
      window.addEventListener('load', function (event) {
          document.getElementById("server").value = "us-e1.chainweb.com"
-         document.getElementById("networkId").value = "mainnet01"
+         // document.getElementById("networkId").value = "mainnet01"
          validateInput("from-pub-key", checkKey);
          validateInput("from-account", checkAccountName);
          validateInput("to-account", checkAccountName);
@@ -446,11 +446,7 @@
                 </div>
                 <div class="field">
                     <label>FROM Public Key</label>
-                    <!-- <label>FROM Public Key</label> -->
                     <input type="text" id="from-pub-key" placeholder="Enter From Public Key">
-                <!-- </div>
-                <div class="field"> -->
-                    <!-- <label>FROM Private Key</label> -->
                 </div>
                 <div>
                   <div id="signature-field" class="field">

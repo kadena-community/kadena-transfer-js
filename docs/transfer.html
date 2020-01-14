@@ -31,6 +31,12 @@
          }
          return true;
      }
+
+    const checkSignature = (sig) => {
+      //ADD VERIFICATION
+      return true;
+    }
+
      function checkAccountName(accountName) {
          if (accountName.length<3) {
              throw "Account name is too short!";
@@ -61,12 +67,22 @@
          return Math.round((new Date).getTime()/1000)-15;
      }
 
-     function getVersion(server) {
+     function getVersion1(server) {
          if (server.includes("testnet")) {
              return "testnet04"
          } else {
              return "mainnet01"
          }
+     }
+
+     async function getVersion(server){
+       try {
+         const nodeInfo = await fetch(`https://${server}/info`);
+         const nodeInfoJSON = await nodeInfo.json();
+         return nodeInfoJSON.nodeVersion;
+       } catch(e){
+         console.log(e)
+       }
      }
 
      function disableSubmit() {
@@ -91,10 +107,12 @@
      };
 
      const sendNonJson = async function(sendCmd, apiHost){
-         if (!apiHost)  throw new Error(`Pact.fetch.send(): No apiHost provided`);
-         const c = Pact.api.prepareExecCmd( sendCmd.keyPairs, sendCmd.nonce, sendCmd.pactCode,
+        if (!apiHost)  throw new Error(`Pact.fetch.send(): No apiHost provided`);
+        var c = Pact.simple.exec.createCommand( sendCmd.keyPairs, sendCmd.nonce, sendCmd.pactCode,
                                             sendCmd.envData, sendCmd.meta, sendCmd.networkId);
-         const txRes = await fetch(`${apiHost}/api/v1/send`, mkReq(Pact.api.mkPublicSend([c])));
+        if (document.getElementById("select-signature").value === "signature")  c = JSON.parse(JSON.stringify(c).replace("REPLACE THIS WITH SIGNATURE", sendCmd.signature))
+        console.log(c)
+         const txRes = await fetch(`${apiHost}/api/v1/send`, mkReq(c));
          return txRes;
      };
 
@@ -110,8 +128,9 @@
      function hideSpinner() {
          //document.getElementById('pending-spinner').setAttribute("class", "ui dimmer");
      }
-     async function transfer(fromAccount, toAccount, amount, fromPub, fromPriv, server, chainId){
+     async function transfer(fromAccount, toAccount, amount, fromPub, fromPriv, server, chainId, signature){
          //diable button to avoid multiple presses
+         const networkId = await getVersion(server);
          disableSubmit();
          m = Pact.lang.mkMeta(fromAccount, chainId, 0.00001, 600, createTime(), 28800);
          console.log(m);
@@ -119,9 +138,10 @@
              pactCode: `(coin.transfer ${JSON.stringify(fromAccount)} ${JSON.stringify(toAccount)} ${convertDecimal(amount)})`,
              keyPairs: [{publicKey: fromPub, secretKey: fromPriv, clist: [{name: "coin.GAS", args: []}, {name: "coin.TRANSFER", args: [fromAccount, toAccount, parseFloat(amount)]}]}],
              meta: m,
-             networkId: getVersion(server),
+             networkId: networkId,
+             signature: signature
          };
-         host = `https://` + server + `/chainweb/0.0/${getVersion(server)}/chain/${chainId}/pact`;
+         host = `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
          handleResult = async function(res) {
              foo = await res;
              hideSpinner();
@@ -133,7 +153,7 @@
                  document.getElementById('request-key').textContent = "Request Key: " + reqKey;
                  showSpinner();
                  //do a listen
-                 Pact.fetch.listen({ listen: reqKey }, `https://` + server + `/chainweb/0.0/${getVersion(server)}/chain/${chainId}/pact`)
+                 Pact.fetch.listen({ listen: reqKey }, `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`)
                      .then(res => {
                          if (res.result.status === "success") {
                              document.getElementById('status-message').textContent = "TRANSFER SUCCEEDED"
@@ -172,12 +192,13 @@
      }
      function setSubmitStatus() {
          e = document.getElementById('chain-id');
+         s = document.getElementById('select-signature');
          if ( hasValue('from-account') &&
               hasValue('to-account') &&
               hasValue('amount') &&
               hasValue('from-pub-key') &&
-              hasValue('from-priv-key') &&
               hasValue('server') &&
+              s.selectedIndex > 0 &&
               e.selectedIndex > 0 ) {
              enableSubmit();
          } else {
@@ -188,7 +209,7 @@
        var e = document.getElementById('chain-id');
        var chainId = e.options[e.selectedIndex].value
        var server = document.getElementById("server").value
-       var host = `https://` + server + `/chainweb/0.0/${getVersion(server)}/chain/${chainId}/pact`;
+       var host = `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
        if (accountName.length<3) {
            setError("Account name is too short!");
        }
@@ -200,7 +221,7 @@
          pactCode: `(coin.details ${JSON.stringify(accountName)})`,
          keyPairs: [{publicKey: kp.publicKey, secretKey: kp.secretKey, clist: [{name: "coin.GAS", args: []}]}],
          meta: Pact.lang.mkMeta(accountName, chainId, 0.00001, 600, createTime(), 28800),
-         networkId: getVersion(server),
+         networkId: networkId,
        }
        const local = await Pact.fetch.local(localObj, host);
        try {
@@ -227,13 +248,13 @@
                  setSubmitStatus();
              }
              catch(err) {
-                 setError(err);
+               disableSubmit();
+               setError(err);
              }
          }, false);
      }
      window.addEventListener('load', function (event) {
          document.getElementById("server").value = "us-e1.chainweb.com"
-         validateInput("from-priv-key", checkSecretKey);
          validateInput("from-pub-key", checkKey);
          validateInput("from-account", checkAccountName);
          validateInput("to-account", checkValidPubKey);
@@ -246,6 +267,11 @@
               checkValidPubKey(document.getElementById("to-account").value)
              setSubmitStatus();
          });
+         document.getElementById("select-signature").addEventListener("change", function(event) {
+           if (event.target.value === "signature") validateInput("from-signature", checkSignature);
+           if (event.target.value === "privKey") validateInput("from-priv-key", checkSecretKey);
+           setSubmitStatus();
+         });
      }, false);
 
      document.addEventListener('click', async function (event) {
@@ -254,10 +280,10 @@
          // sel.options[sel.selectedIndex].text
          var e = document.getElementById('chain-id');
          var p = document.getElementById('predicate');
-         var rawPriv = document.getElementById('from-priv-key').value;
+         var rawPriv = document.getElementById('from-priv-key')? document.getElementById('from-priv-key').value : null;
          if (rawPriv.length===128) priv = rawPriv.slice(0, 64);
          else priv = rawPriv;
-
+         var sig =  document.getElementById('from-signature') ? document.getElementById('from-signature') : null
          transfer(
              document.getElementById('from-account').value,
              document.getElementById('to-account').value,
@@ -265,7 +291,8 @@
              document.getElementById('from-pub-key').value,
              priv,
              document.getElementById('server').value,
-             e.options[e.selectedIndex].value
+             e.options[e.selectedIndex].value,
+             sig
          )
 
      }, false);
@@ -304,6 +331,12 @@
        }
      }
 
+     var selectSig = function(){
+       const inputDiv = document.getElementById("signature-input")
+       const sigOption = document.getElementById("select-signature").value;
+       if (sigOption === "signature") inputDiv.innerHTML = `<input type="text" id="from-signature" placeholder="Enter Signature">`
+       else if (sigOption === "privKey") inputDiv.innerHTML = `<div><input type="text" id="from-priv-key" placeholder="Enter From Private Key"></div><div><input id="priv-file" type="file" class="ui primary button" onchange="PrivLoad()"/></div>`
+     }
 
     </script>
 </head>
@@ -356,19 +389,20 @@
                     <input type="text" id="amount" placeholder="Enter Your Amount To Transfer">
                 </div>
                 <div class="field">
-                    <label>FROM Keypair</label>
-                    <!-- <label>FROM Public Key</label> -->
+                    <label>FROM Public Key</label>
                     <input type="text" id="from-pub-key" placeholder="Enter From Public Key">
-                <!-- </div>
-                <div class="field"> -->
-                    <!-- <label>FROM Private Key</label> -->
-                    <div>
-                      <input type="text" id="from-priv-key" placeholder="Enter From Private Key">
-                    </div>
-                    <div>
-                      <input id="priv-file" type="file" class="ui primary button" onchange="PrivLoad()"/>
-                    </div>
                 </div>
+                <div>
+                  <div id="signature-field" class="field">
+                      <label>FROM SIGN (Private Key or Signature)</label>
+                  </div>
+                  <select type="text" class="ui dropdown" id="select-signature" placeholder="Options to Sign" onchange="selectSig()">
+                    <option value="">Pick Signing Option</option>
+                    <option value="privKey">Private Key</option>
+                    <option value="signature">Signature</option>
+                  </select>
+                </div>
+                <div class="field" id="signature-input"></div>
             <div id="acct-err" class="ui center error message">
             </div>
 
@@ -449,6 +483,14 @@
 .ui #priv-file{
   width: 300px;
   height: 40px;
+}
+.ui #select-signature {
+  margin-top: 0px;
+  width: 300px;
+}
+.ui #from-signature {
+  margin-top: 5px;
+  width: 300px;
 }
 table#data-table {
   margin-left:auto;
