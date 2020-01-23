@@ -94,6 +94,8 @@
          if (!apiHost)  throw new Error(`Pact.fetch.send(): No apiHost provided`);
          const c = Pact.api.prepareExecCmd( sendCmd.keyPairs, sendCmd.nonce, sendCmd.pactCode,
                                             sendCmd.envData, sendCmd.meta, sendCmd.networkId);
+         console.log(Pact.api.mkPublicSend([c]))
+         console.log(`curl -sk -H \"Content-Type: application/json\" -d '${JSON.stringify(Pact.api.mkPublicSend([c]))}' -X POST ${apiHost}/api/v1/send`)
          const txRes = await fetch(`${apiHost}/api/v1/send`, mkReq(Pact.api.mkPublicSend([c])));
          return txRes;
      };
