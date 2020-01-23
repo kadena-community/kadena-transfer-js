@@ -181,7 +181,8 @@
               e.selectedIndex > 0 ) {
              enableSubmit();
          } else {
-             disableSubmit();
+             // disableSubmit();
+             enableSubmit();
          }
      }
      const checkValidPubKey = async (accountName) => {
@@ -202,17 +203,18 @@
          meta: Pact.lang.mkMeta(accountName, chainId, 0.00001, 600, createTime(), 28800),
          networkId: getVersion(server),
        }
-       const local = await Pact.fetch.local(localObj, host);
-       try {
-         const pubKey = local.result.data.guard.keys[0]
-         if (is_hexadecimal(pubKey) && checkKey(pubKey)) {
-           return true;
-         } else {
-           setError("account provided is guarded by invalid keypair")
-         }
-       } catch(e) {
-          setError("to account does not exist on taget chain")
-       }
+       return true;
+       // const local = await Pact.fetch.local(localObj, host);
+       // try {
+       //   const pubKey = local.result.data.guard.keys[0]
+       //   if (is_hexadecimal(pubKey) && checkKey(pubKey)) {
+       //     return true;
+       //   } else {
+       //     setError("account provided is guarded by invalid keypair")
+       //   }
+       // } catch(e) {
+       //    setError("to account does not exist on taget chain")
+       // }
 
      }
      function validateInput(elemId, checkInput) {
