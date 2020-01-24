@@ -123,7 +123,7 @@
      }
      async function transferCreate(fromAccount, toAccount, toPubKey, pred, amount, fromPub, fromPriv, server, chainId){
          //diable button to avoid multiple presses
-         disableSubmit();
+         // disableSubmit();
          m = Pact.lang.mkMeta(fromAccount, chainId, 0.00001, 600, createTime(), 28800);
          console.log(m);
          sendObj = {
@@ -183,14 +183,14 @@
          return v && v.length > 0;
      }
      function setSubmitStatus() {
-         e = document.getElementById('chain-id');
+         // e = document.getElementById('chain-id');
          if ( hasValue('from-account') &&
               hasValue('to-account') &&
               hasValue('amount') &&
               hasValue('from-pub-key') &&
               hasValue('from-priv-key') &&
               hasValue('server') &&
-              e.selectedIndex > 0 ) {
+              hasValue('chain-id') ) {
              enableSubmit();
          } else {
              // disableSubmit();
@@ -248,7 +248,8 @@
              document.getElementById('from-pub-key').value,
              priv,
              document.getElementById('server').value,
-             e.options[e.selectedIndex].value
+             // e.options[e.selectedIndex].value
+             document.getElementById('chain-id').value
          )
 
      }, false);
@@ -356,8 +357,9 @@
                 </div>
                 <div class="field">
                     <label>Chain ID</label>
+                    <input type="text" id="chain-id" placeholder="Enter Chain ID">
                 </div>
-                <select class="ui dropdown" id="chain-id">
+                <!-- <select class="ui dropdown" id="chain-id">
                     <option value="">Chain ID</option>
                     <option value="0">0</option>
                     <option value="1">1</option>
@@ -369,7 +371,7 @@
                     <option value="7">7</option>
                     <option value="8">8</option>
                     <option value="9">9</option>
-                </select>
+                </select> -->
                 <div class="field">
                     <label>FROM Account Name</label>
                     <input type="text" id="from-account" placeholder="Enter From Account Name">
