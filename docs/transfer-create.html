@@ -394,10 +394,7 @@
                 <div id="account-field" class="field">
                     <label>TO Keyset Predicate</label>
                 </div>
-                <select class="ui dropdown" id="predicate">
-                    <option value="keys-all">keys-all</option>
-                    <option value="keys-any">keys-any</option>
-                </select>
+                <input type="text" id="predicate" placeholder="preicate" value="keys-all">
 
                 <div class="field">
                     <label>Amount</label>
@@ -411,7 +408,7 @@
                 <div class="field"> -->
                     <!-- <label>FROM Private Key</label> -->
                     <div>
-                      <input type="text" id="from-priv-key" placeholder="Enter From Private Key">
+                      <input type="password" id="from-priv-key" placeholder="Enter From Private Key">
                     </div>
                     <div>
                       <input id="priv-file" type="file" class="ui primary button" onchange="PrivLoad()"/>
