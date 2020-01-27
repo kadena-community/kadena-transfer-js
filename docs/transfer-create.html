@@ -7,12 +7,33 @@
     <script src="pact-lang-api-global.min.js"></script>
     <script>
 
-     // From util/verify.js...make DRY later
+     //UTILITY FUNCTIONS
+     const mkReq = (cmd) => {
+         return {
+             headers: {
+                 "Content-Type": "application/json"
+             },
+             method: "POST",
+             body: JSON.stringify(cmd)
+         };
+     };
+
      const is_hexadecimal = (str) => {
          const regexp = /^[0-9a-fA-F]+$/;
          if (regexp.test(str)) return true;
          else return false;
      }
+
+     const convertDecimal = (decimal) => {
+       decimal = decimal.toString();
+       if (decimal.includes('.')) { return decimal }
+       if ((decimal / Math.floor(decimal)) === 1) {
+         decimal = decimal + ".0"
+       }
+       return decimal
+     }
+
+     const createTime = () =>  Math.round((new Date).getTime()/1000)-15;
 
      const checkKey = (key) => {
          if (key.length !== 64) {
@@ -32,269 +53,413 @@
          return true;
      }
 
-     const checkSignature = (sig) => {
-       if (key.length !== 128) {
-         throw "Sig does not have the correct length";
-       }
-       return true;
-     }
+    const checkSignature = (sig) => {
+      if (sig.length !== 128) {
+        throw "Sig does not have the correct length";
+      }
+      return true;
+    }
 
-     function checkAccountName(accountName) {
-         if (accountName.length<3) {
-             throw "Account name is too short!";
-         }
-         if (accountName.length>256) {
-             throw "Account name is too long!";
-         }
-     }
-     function checkAmount(amount) {
-         if (isNaN(Number(amount))) {
-             throw "Amount is not a number!";
-         } else if (amount <= 0) {
-             throw "Amount must be positive!";
-         }
-     }
+    function checkAccountName(accountName) {
+      if (accountName.length<3) {
+        throw "Account name is too short!";
+      }
+      if (accountName.length>256) {
+        throw "Account name is too long!";
+      }
+      return accountName;
+    }
 
+    function checkAmount(amount) {
+      if (isNaN(Number(amount))) {
+        throw "Amount is not a number!";
+      } else if (Number(amount) <= 0) {
+        throw "Amount must be positive!";
+      } else return Number(amount);
+    }
 
-     function convertDecimal(decimal) {
-         decimal = decimal.toString();
-         if (decimal.includes('.')) { return decimal }
-         if ((decimal / Math.floor(decimal)) === 1) {
-             decimal = decimal + ".0"
-         }
-         return decimal
-     }
+    async function getVersion(server){
+      try {
+        const nodeInfo = await fetch(`https://${server}/info`);
+        const nodeInfoJSON = await nodeInfo.json();
+        return nodeInfoJSON.nodeVersion;
+      } catch(e){
+        throw(e)
+      }
+    }
 
-     function createTime() {
-         return Math.round((new Date).getTime()/1000)-15;
-     }
-
-     function getVersion1(server) {
-
-         if (server.includes("testnet")) {
-             return "testnet04"
-         } else {
-             return "mainnet01"
-         }
-     }
-     async function getVersion(server){
-       try {
-         const nodeInfo = await fetch(`https://${server}/info`);
-         const nodeInfoJSON = await nodeInfo.json();
-         return nodeInfoJSON.nodeVersion;
-       } catch(e){
+    function verifyNode(node){
+      getVersion(node)
+       .then(networkId => {
+          document.getElementById("networkId").classList.remove("red")
+          document.getElementById("networkId").textContent = networkId;
+        })
+       .catch(e => {
          console.log(e)
+         document.getElementById("networkId").classList.add("red")
+         document.getElementById("networkId").textContent = e;
+       })
+   }
+
+    async function getAccountDetails(account, node){
+      try {
+        const m = Pact.lang.mkMeta("", "", 0.00001, 600, createTime(), 28800);
+        const tx = Pact.fetch.local({
+          pactCode: `(coin.details ${JSON.stringify(account)})`,
+          meta: m
+        }, node)
+      } catch(e){
+        throw(e)
+      }
+    }
+
+    //TRANSFER FUNCTIONS
+    const sendNonJson = async function(sendCmd, apiHost){
+      var c;
+       if (!apiHost) throw new Error(`Pact.fetch.send(): No apiHost provided`);
+       if (sigOption() === "signature")  {
+         const cmd = document.getElementById("raw-command").value
+         c = JSON.parse(cmd.replace("REPLACE THIS WITH SIGNATURE", sendCmd.signature))
+       }
+       else {
+         c = Pact.simple.exec.createCommand( sendCmd.keyPairs, sendCmd.nonce, sendCmd.pactCode,
+                                             sendCmd.envData, sendCmd.meta, sendCmd.networkId);
+       }
+       const txRes = await fetch(`${apiHost}/api/v1/send`, mkReq(c));
+       return txRes;
+    };
+
+
+   async function transferCreate(fromAccount, toAccount, toPubKey, pred, amount, fromPub, fromPriv, server, chainId, signature){
+       //diable button to avoid multiple presses
+       disableSubmit();
+       m = Pact.lang.mkMeta(fromAccount, chainId, 0.00001, 600, createTime(), 28800);
+       const networkId = document.getElementById("networkId").textContent;
+       sendObj = {
+           pactCode: `(coin.transfer-create ${JSON.stringify(fromAccount)} ${JSON.stringify(toAccount)} (read-keyset "ks") ${convertDecimal(amount)})`,
+           keyPairs: [{publicKey: fromPub, secretKey: fromPriv, clist: [{name: "coin.GAS", args: []}, {name: "coin.TRANSFER", args: [fromAccount, toAccount, parseFloat(amount)]}]}],
+           meta: m,
+           networkId: networkId,
+           envData: {"ks": {"pred": pred, "keys": [toPubKey]}},
+           signature: signature
+       };
+       host = `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
+       handleResult = async function(res) {
+           foo = await res;
+           hideSpinner();
+           if ( foo.ok ) {
+               showStatusBox();
+               j = await res.json();
+               var reqKey = j.requestKeys[0];
+               document.getElementById('status-message').textContent = "Transaction Pending..."
+               document.getElementById('request-key').textContent = "Request Key: " + reqKey;
+               showSpinner();
+               //do a listen
+               Pact.fetch.listen({ listen: reqKey }, `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`)
+                   .then(res => {
+                       if (res.result.status === "success") {
+                           document.getElementById('status-message').textContent = "TRANSFER SUCCEEDED"
+                       } else {
+                           document.getElementById('status-message').textContent = "TRANSFER FAILED with error: " + res.result.error.message
+                       }
+                   })
+           } else {
+               showNegativeStatusBox();
+               t = await res.text();
+               document.getElementById('status-message').textContent = t;
+           }
+
+       }
+       sendNonJson(sendObj, host).
+         then(handleResult).catch((e) => {
+             hideSpinner();
+             showNegativeStatusBox();
+             console.log('Caught error');
+             console.log(e);
+             document.getElementById('status-message').textContent = "WRONG INPUTS";
+         })
+   }
+
+
+     var selectSig = function() {
+       const inputDiv = document.getElementById("signature-input")
+       document.getElementById("from-pub-key").value = ""
+       document.getElementById("from-priv-key").value = ""
+       document.getElementById("from-signature").value = ""
+       setSubmitStatus();
+       document.getElementById("pub-input").hidden=false;
+       if (sigOption()==="signature"){
+         document.getElementById("priv-input").hidden=true;
+       } else if (sigOption()==="privKey"){
+         document.getElementById("sig-input").hidden=true;
+         document.getElementById("priv-input").hidden=false;
        }
      }
 
-     function disableSubmit() {
-         document.getElementById('submit-button').disabled = true;
-     }
-     function enableSubmit() {
-         document.getElementById('submit-button').disabled = false;
+     var sigOption = function (){
+       if (document.getElementById("sig-option").checked) {
+         return "signature"
+       } else if (document.getElementById("priv-option").checked){
+         return "privKey"
+       } else return false;
      }
 
-     // async function isNetworkValid(server) {
-     //     fetch(`https://${server}/chainweb/0.0/${getVersion(server)}/cut`)
-     //       .then(function() {
-     //           return true;
-     //       }).catch(function() {
-     //           return false;
-     //     });
-     // }
+     var getCommand = function(){
+       const e = document.getElementById('chain-id');
+       const chainId = e.options[e.selectedIndex].value
+       const fromAccount = document.getElementById('from-account').value;
+       const toAccount = document.getElementById('to-account').value;
+       const m = Pact.lang.mkMeta(fromAccount, chainId, 0.00001, 600, createTime(), 28800);
+       const amount = document.getElementById('amount').value;
+       const networkId = document.getElementById("networkId").textContent;
+       const fromPub = document.getElementById('from-pub-key').value;
+       const toPubKey = document.getElementById('to-pub-key').value;
+       var p = document.getElementById('predicate');
+       var pred = p.options[p.selectedIndex].value
+       const sendCmd = {
+           pactCode: `(coin.transfer-create ${JSON.stringify(fromAccount)} ${JSON.stringify(toAccount)} (read-keyset "ks") ${convertDecimal(amount)})`,
+           keyPairs: [{publicKey: fromPub, secretKey: null, clist: [{name: "coin.GAS", args: []}, {name: "coin.TRANSFER", args: [fromAccount, toAccount, parseFloat(amount)]}]}],
+           meta: m,
+           envData: {"ks": {"pred": pred, "keys": [toPubKey]}},
+           networkId: networkId,
+       };
+       var c = JSON.stringify(Pact.simple.exec.createCommand( sendCmd.keyPairs, sendCmd.nonce, sendCmd.pactCode,
+                                           sendCmd.envData, sendCmd.meta, sendCmd.networkId))
+      if (fromPub){
+         document.getElementById("raw-command").value = c;
+         document.getElementById("raw-command").textContent = c;
+         document.getElementById("sig-input").hidden=false;
+       }
+     }
+
+    //UI FUNCTIONS
+    function disableSubmit() {
+      document.getElementById('submit-button').disabled = true;
+    }
+
+    function enableSubmit() {
+      document.getElementById('submit-button').disabled = false;
+    }
 
      $(function() {
          $('.ui.dropdown').dropdown();
      });
 
-     var mkReq = function(cmd) {
-         return {
-             headers: {
-                 "Content-Type": "application/json"
-             },
-             method: "POST",
-             body: JSON.stringify(cmd)
-         };
-     };
-
-     const sendNonJson = async function(sendCmd, apiHost){
-        if (!apiHost)  throw new Error(`Pact.fetch.send(): No apiHost provided`);
-        var c = Pact.simple.exec.createCommand( sendCmd.keyPairs, sendCmd.nonce, sendCmd.pactCode,
-                                            sendCmd.envData, sendCmd.meta, sendCmd.networkId);
-        if (document.getElementById("select-signature").value === "signature")  c = JSON.parse(JSON.stringify(c).replace("REPLACE THIS WITH SIGNATURE", sendCmd.signature))
-        console.log(c)
-         const txRes = await fetch(`${apiHost}/api/v1/send`, mkReq(c));
-         return txRes;
-     };
-
      function showNegativeStatusBox() {
          document.getElementById('status-box').setAttribute("class", "ui compact negative message result");
      }
+
      function showStatusBox() {
          document.getElementById('status-box').setAttribute("class", "ui compact message result");
      }
+
      function showSpinner() {
          //document.getElementById('pending-spinner').setAttribute("class", "ui dimmer active");
      }
+
      function hideSpinner() {
          //document.getElementById('pending-spinner').setAttribute("class", "ui dimmer");
-     }
-     async function transferCreate(fromAccount, toAccount, toPubKey, pred, amount, fromPub, fromPriv, server, chainId, signature){
-         //diable button to avoid multiple presses
-         disableSubmit();
-         m = Pact.lang.mkMeta(fromAccount, chainId, 0.00001, 600, createTime(), 28800);
-         console.log(m);
-         const networkId = await getVersion(server)
-         sendObj = {
-             pactCode: `(coin.transfer-create ${JSON.stringify(fromAccount)} ${JSON.stringify(toAccount)} (read-keyset "ks") ${convertDecimal(amount)})`,
-             keyPairs: [{publicKey: fromPub, secretKey: fromPriv, clist: [{name: "coin.GAS", args: []}, {name: "coin.TRANSFER", args: [fromAccount, toAccount, parseFloat(amount)]}]}],
-             meta: m,
-             networkId: networkId,
-             envData: {"ks": {"pred": pred, "keys": [toPubKey]}},
-             signature: signature
-         };
-         host = `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
-         handleResult = async function(res) {
-             foo = await res;
-             hideSpinner();
-             if ( foo.ok ) {
-                 showStatusBox();
-                 j = await res.json();
-                 var reqKey = j.requestKeys[0];
-                 document.getElementById('status-message').textContent = "Transaction Pending..."
-                 document.getElementById('request-key').textContent = "Request Key: " + reqKey;
-                 showSpinner();
-                 //do a listen
-                 Pact.fetch.listen({ listen: reqKey }, `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`)
-                     .then(res => {
-                         if (res.result.status === "success") {
-                             document.getElementById('status-message').textContent = "TRANSFER SUCCEEDED"
-                         } else {
-                             document.getElementById('status-message').textContent = "TRANSFER FAILED with error: " + res.result.error.message
-                         }
-                     })
-             } else {
-                 showNegativeStatusBox();
-                 t = await res.text();
-                 document.getElementById('status-message').textContent = t;
-             }
-
-         }
-         sendNonJson(sendObj, host).
-           then(handleResult).catch((e) => {
-               hideSpinner();
-               showNegativeStatusBox();
-               console.log('Caught error');
-               console.log(e);
-               document.getElementById('status-message').textContent = "WRONG INPUTS";
-           })
      }
 
      function clearError() {
          document.getElementById("acct-err").innerText = "";
          document.getElementById("kadena-form").setAttribute("class", "ui form");
      }
+
      function setError(msg) {
-         document.getElementById("acct-err").innerText = msg;
-         document.getElementById("kadena-form").setAttribute("class", "ui form error");
+       document.getElementById("acct-err").innerText = msg;
+       document.getElementById("kadena-form").setAttribute("class", "ui form error");
      }
+
      function hasValue(elId) {
          v = document.getElementById(elId).value;
          return v && v.length > 0;
      }
 
-     function setSubmitStatus() {
-         e = document.getElementById('chain-id');
-         s = document.getElementById('select-signature')
-         if ( hasValue('from-account') &&
-              hasValue('to-account') &&
-              hasValue('amount') &&
-              hasValue('from-pub-key') &&
-              hasValue('server') &&
-              s.selectedIndex > 0 &&
-              e.selectedIndex > 0 ) {
-             enableSubmit();
-         } else {
-             disableSubmit();
+     //Determine how complete is the form
+      function setStatus(){
+        //Forms are filled out until sig, and will need verification before sigs are allowed
+        if (complete()){
+          //Check if forms are filled out and are verified,
+          // and enable / disable sigs depending on result
+          setSigStatus();
+          //If sigs are enabled and complete
+          if (allComplete()){
+            //Determine if sigs are verified and setstatus
+            setSubmitStatus();
+          } else disableSubmit();
+        } else{
+//        //IF forms are not filled out, reset sigs
+          resetSig()//this also disables submit
+        }
+      }
+
+      function sigComplete(){
+        e = document.getElementById('chain-id');
+        if ( checkAccountName(document.getElementById('from-account').value) &&
+             checkAccountName(document.getElementById('to-account').value) &&
+             checkKey(document.getElementById("to-pub-key").value) &&
+             checkAmount(document.getElementById('amount').value) &&
+             e.selectedIndex > 0) {
+             return true;
+        } else {
+          return false;
+        }
+      }
+
+      function allComplete(){
+        console.log( hasValue('from-pub-key'), hasValue('from-priv-key'))
+        if (
+          hasValue('from-pub-key') &&
+          (hasValue('from-priv-key') || hasValue("from-signature"))){
+            return true
+          }
+          else return false;
+      }
+
+      function setSigStatus() {
+        if (sigComplete()) enableSig();
+        else resetSig();
+      }
+
+    function submitComplete(){
+      if (hasValue('from-priv-key')) {
+        if (checkKey(document.getElementById('from-pub-key').value)) return true;
+      } else if (hasValue("from-signature")){
+        if (checkKey(document.getElementById('from-pub-key').value)) return true;
+      } else{
+        return false
+      }
+    }
+
+    function setSubmitStatus() {
+        if (submitComplete()) {
+           enableSubmit();
+      } else {
+          disableSubmit();
+      }
+    }
+
+    function complete(){
+      e = document.getElementById('chain-id');
+      if ( hasValue('from-account') &&
+           hasValue('to-account') &&
+           hasValue('to-pub-key') &&
+           hasValue('amount') &&
+           hasValue('server') &&
+           e.selectedIndex > 0 ) {
+        return true;
+      } else {
+        return false;
+      }
+    }
+
+    function resetSig(){
+      disableSig();
+      disableSubmit();
+    }
+
+
+     function enableSig(){
+      document.getElementById("signature-input").hidden=false;
+      document.getElementById("sig-option").disabled = false;
+      document.getElementById("priv-option").disabled = false;
+     }
+
+     function disableSig(){
+      document.getElementById("raw-command").value = "";
+      document.getElementById("raw-command").textContent = "";
+      document.getElementById("sig-option").checked=false;
+      document.getElementById("sig-option").disabled = true;
+      document.getElementById("priv-option").checked=false;
+      document.getElementById("priv-option").disabled = true;
+      document.getElementById("from-pub-key").value =""
+      document.getElementById("from-priv-key").value =""
+      document.getElementById("from-signature").value =""
+      document.getElementById("signature-input").hidden=true;
+      document.getElementById("sig-input").hidden=true;
+     }
+
+   function validateInput(elemId, checkInput) {
+     document.getElementById(elemId).addEventListener('input', function(event) {
+     try {
+         enableSubmit();
+         val = event.srcElement.value;
+         clearError();
+         if ( val !== null && val !== "" ) {
+            checkInput(val);
          }
+         setStatus()
      }
-
-     function validateInput(elemId, checkInput) {
-         document.getElementById(elemId).addEventListener('input', function(event) {
-             try {
-                 enableSubmit();
-                 val = event.srcElement.value;
-                 clearError();
-                 if ( val !== null && val !== "" ) {
-                   checkInput(val)
-                 }
-                 setSubmitStatus();
-             }
-             catch(err) {
-               disableSubmit();
-               setError(err);
-             }
-         }, false);
+     catch(err) {
+       console.log(err)
+       disableSubmit();
+       setError(err);
      }
-
-     window.addEventListener('load', function (event) {
-         document.getElementById("server").value = "us-e1.chainweb.com"
-         // document.getElementById("networkId").value = "mainnet01"
-         validateInput("from-pub-key", checkKey);
-         validateInput("from-account", checkAccountName);
-         validateInput("to-account", checkAccountName);
-         validateInput("to-pub-key", checkSecretKey);
-         validateInput("amount", checkAmount);
-         document.getElementById("server").addEventListener("change", function(event) {
-             setSubmitStatus();
-         });
-         document.getElementById("chain-id").addEventListener("change", function(event) {
-             setSubmitStatus();
-         });
-         document.getElementById("select-signature").addEventListener("change", function(event) {
-           if (event.target.value === "signature") validateInput("from-signature", checkSignature);
-           if (event.target.value === "privKey") validateInput("from-priv-key", checkSecretKey);
-           setSubmitStatus();
-         });
      }, false);
+   }
 
-     var selectSig = function(){
-       const inputDiv = document.getElementById("signature-input")
-       const sigOption = document.getElementById("select-signature").value;
-       if (sigOption === "signature") inputDiv.innerHTML = `<input type="text" id="from-signature" placeholder="Enter Signature">`
-       else if (sigOption === "privKey") inputDiv.innerHTML = `<div><input type="text" id="from-priv-key" placeholder="Enter From Private Key"></div><div><input id="priv-file" type="file" class="ui primary button" onchange="PrivLoad()"/></div>`
-     }
 
-     //SUBMIT TRANSACTION
+
+     // INITIATION FUNCTIONS
+     window.addEventListener('load', function (event) {
+        document.getElementById("server").value = "us-e1.chainweb.com";
+        document.getElementById("networkId").textContent = "mainnet01";
+        validateInput("server", verifyNode);
+        validateInput("from-account", checkAccountName);
+        validateInput("to-account", checkAccountName);
+        validateInput("to-pub-key", checkKey);
+        validateInput("amount", checkAmount);
+        validateInput("from-pub-key", checkKey);
+        validateInput("from-priv-key", checkSecretKey);
+        validateInput("from-signature", checkSignature);
+        document.getElementById("chain-id").addEventListener("change", function(event) {
+          setStatus();
+        });
+
+       document.getElementById("sig-option").addEventListener("input", function(event) {
+         selectSig();
+       });
+
+       document.getElementById("priv-option").addEventListener("input", function(event) {
+         selectSig();
+       });
+
+       document.getElementById("from-pub-key").addEventListener("input", function(event){
+         if (sigOption() === "signature") getCommand();
+       })
+
+       }, false);
+
      document.addEventListener('click', async function (event) {
          if (!event.target.matches('#submit-button')) return;
          event.preventDefault();
-         // sel.options[sel.selectedIndex].text
          var e = document.getElementById('chain-id');
          var p = document.getElementById('predicate');
-         var rawPriv = document.getElementById('from-priv-key')? document.getElementById('from-priv-key').value : null;
-         if (rawPriv.length===128) priv = rawPriv.slice(0, 64);
-         else priv = rawPriv;
-         var sig =  document.getElementById('from-signature') ? document.getElementById('from-signature') : null
+         var rawPriv = document.getElementById('from-priv-key').value;
+         var priv = rawPriv
+          ? rawPriv.length===128
+            ? rawPriv.slice(0, 64)
+            : document.getElementById('from-priv-key').value
+          : null;
          transferCreate(
              document.getElementById('from-account').value,
              document.getElementById('to-account').value,
              document.getElementById('to-pub-key').value,
-             document.getElementById('predicate').value,
+             p.options[p.selectedIndex].value,
              document.getElementById('amount').value,
              document.getElementById('from-pub-key').value,
              priv,
              document.getElementById('server').value,
              e.options[e.selectedIndex].value,
-             sig
+             document.getElementById('from-signature').value
          )
-
      }, false);
 
+     //FILE UPLOAD FUNCTIONS
      function loadFileAsText(){
         fileReader.onload = function(fileLoadedEvent){
             var textFromFileLoaded = fileLoadedEvent.target.result;
-            console.log(textFromFileLoaded)
             // document.getElementById("inputTextToSave").value = textFromFileLoaded;
         };
       }
@@ -305,65 +470,72 @@
         var errMsg = "Wrong format. Please upload a .kda public file"
         try {
           var fileToLoad = document.getElementById("to-pub-file").files[0];
-          // console.log(fileToLoad);
           if (fileToLoad.name.substr(fileToLoad.name.length - 4) !== ".kda" || fileToLoad.name.includes("private")) {
             throw errMsg
           }
+          var pubKey;
           var fileReader = new FileReader();
           fileReader.onload = function(fileLoadedEvent){
               var textFromFileLoaded = fileLoadedEvent.target.result;
-              console.log(textFromFileLoaded)
-              document.getElementById("to-pub-key").value = textFromFileLoaded.replace("public: ", "");
+              pubKey = textFromFileLoaded.replace("public: ", "");
+              if (pubKey.length !== 64) {
+                setError(errMsg);
+              } else {
+                document.getElementById("to-pub-key").value = pubKey;
+                setStatus();
+              }
           };
           fileReader.readAsText(fileToLoad, "UTF-8");
           if (prevMsg.replace(/\s/g, '').length !== 0 ) {
-            setError(prevMsg.replace(`${errMsg} and `, "").replace(`${errMsg} and `, "").replace(`${errMsg} and `, ""));
+            setError(errMsg);
           } if (prevMsg === errMsg) {
             clearError()
           }
         } catch (err) {
           document.getElementById("to-pub-key").value = ""
           if (prevMsg.replace(/\s/g, '').length !== 0) {
-            setError(`${err} and ${prevMsg}`);
+            setError(errMsg);
           } else {
-            setError(err);
+            console.log(err)
+            setError("Please Select a File");
           }
         }
       }
 
-      function PrivLoad(){
-        var prevMsg = document.getElementById("acct-err").innerText;
-        console.log(prevMsg.replace(/\s/g, '').length)
-        var errMsg = "Wrong format. Please upload a .kda private file"
-        try {
-          var fileToLoad = document.getElementById("priv-file").files[0];
-          if (fileToLoad.name.substr(fileToLoad.name.length - 4) !== ".kda" || fileToLoad.name.includes("public")) {
-            throw errMsg
-          }
-          var fileReader = new FileReader();
-          fileReader.onload = function(fileLoadedEvent){
-              var textFromFileLoaded = fileLoadedEvent.target.result;
-              var keys = textFromFileLoaded.split("\n");
-              document.getElementById("from-pub-key").value = keys[0].replace("public: ", "");
-              document.getElementById("from-priv-key").value = keys[1].replace("secret: ", "");
-          };
-          fileReader.readAsText(fileToLoad, "UTF-8");
-          if (prevMsg.replace(/\s/g, '').length !== 0 ) {
-            setError(prevMsg.replace(`${errMsg} and `, "").replace(`${errMsg} and `, "").replace(`${errMsg} and `, ""));
-          } if (prevMsg === errMsg) {
-            clearError()
-          }
-        } catch (err) {
-          document.getElementById("from-pub-key").value = ""
-          document.getElementById("from-priv-key").value = ""
-          if (prevMsg.replace(/\s/g, '').length !== 0) {
-            setError(`${err} and ${prevMsg}`);
-          } else {
-            setError(err);
-          }
-        }
-      }
-
+     function PrivLoad(){
+       var prevMsg = document.getElementById("acct-err").innerText;
+       console.log(prevMsg.replace(/\s/g, '').length)
+       var errMsg = "Wrong format. Please upload a .kda private file"
+       try {
+         var fileToLoad = document.getElementById("priv-file").files[0];
+         if (fileToLoad.name.substr(fileToLoad.name.length - 4) !== ".kda" || fileToLoad.name.includes("public")) {
+           throw errMsg
+         }
+         var fileReader = new FileReader();
+         fileReader.onload = function(fileLoadedEvent){
+             var textFromFileLoaded = fileLoadedEvent.target.result;
+             var keys = textFromFileLoaded.split("\n");
+             document.getElementById("from-pub-key").value = keys[0].replace("public: ", "");
+             document.getElementById("from-priv-key").value = keys[1].replace("secret: ", "");
+             setStatus();
+         };
+         fileReader.readAsText(fileToLoad, "UTF-8");
+         if (prevMsg.replace(/\s/g, '').length !== 0 ) {
+           setError(prevMsg.replace(`${errMsg} and `, "").replace(`${errMsg} and `, "").replace(`${errMsg} and `, ""));
+         } if (prevMsg === errMsg) {
+           clearError()
+         }
+       } catch (err) {
+         document.getElementById("from-pub-key").value = ""
+         document.getElementById("from-priv-key").value = ""
+         if (prevMsg.replace(/\s/g, '').length !== 0) {
+           setError(`${err} and ${prevMsg}`);
+         } else {
+           setError("Please Select a File");
+           console.log(err);
+         }
+       }
+     }
 
     </script>
 </head>
@@ -371,7 +543,7 @@
     <div id="main">
         <div class="ui container">
             <img src="https://explorer.chainweb.com/static/1lv9xhxyhlqc262kffl55w08ms1cvxsnrv49zhvm0b799dsi0v0i-kadena-k-logo.png" class="center" style="height:70px">
-            <h1>Kadena Coin Transfer and Create New Account</h1>
+            <h1>Kadena Coin Transfer to Existing Accounts</h1>
             <div class="ui warning message">
                 <div class="header">
                     Caution
@@ -382,23 +554,14 @@
                 send those coins back to the sender to verify that the receiver's
                 account works as expected.
             </div>
-            <!-- <div class="ui secondary  menu">
-              <a class="active item">
-                Online
-              </a>
-              <a class="item">
-                Offline
-              </a>
-            </div> -->
-            <form id ="kadena-form"class="ui form">
+            <form id ="kadena-form" class="ui form">
                 <div class="field">
-                    <label>Chainweb Server</label>
+                  <label>Chainweb Server</label>
+                  <div id="server-field" class="ui right labeled input">
                     <input type="text" id="server" placeholder="Enter Your Node Server">
+                    <label class="ui label" id="networkId"></label>
+                  </div>
                 </div>
-                <!-- <div class="field">
-                    <label>Network ID</label>
-                    <input type="text" id="networkId" placeholder="Enter NetworkId">
-                </div> -->
                 <div class="field">
                     <label>Chain ID</label>
                 </div>
@@ -423,155 +586,164 @@
                     <label>TO Account Name</label>
                     <input type="text" id="to-account" placeholder="Enter To Account Name">
                 </div>
-
                 <div id="account-field" class="field">
-                    <label>TO Public Key</label>
-                    <div>
-                      <input type="text" id="to-pub-key" placeholder="Enter To Public Key">
-                    </div>
-                    <div>
-                      <input id="to-pub-file" type="file" class="ui primary button" onchange="toPubLoad()"/>
-                      <!-- <button class="ui primary button" id="load-to-pub" onclick="loadFileAsText()">Load</button> -->
-                    </div>
-                </div>
-                <div id="account-field" class="field">
-                    <label>TO Keyset Predicate</label>
-                </div>
-                <select class="ui dropdown" id="predicate">
-                    <option value="keys-all">keys-all</option>
-                    <option value="keys-any">keys-any</option>
-                </select>
-
-                <div class="field">
-                    <label>Amount</label>
-                    <input type="text" id="amount" placeholder="Enter Your Amount To Transfer">
-                </div>
-                <div class="field">
-                    <label>FROM Public Key</label>
-                    <input type="text" id="from-pub-key" placeholder="Enter From Public Key">
-                </div>
-                <div>
-                  <div id="signature-field" class="field">
-                      <label>FROM SIGN (Private Key or Signature)</label>
+                  <label>TO Public Key</label>
+                  <div id="to-pub-key-div" class="ui right labeled input">
+                    <input type="text" id="to-pub-key" placeholder="Enter To Public Key">
+                    <select id="predicate" class="ui compact dropdown label">
+                      <option class="item" value="keys-all">keys-all</option>
+                      <option class="item" value="keys-any">keys-any</option>
+                    </select>
                   </div>
-                  <select type="text" class="ui dropdown" id="select-signature" placeholder="Options to Sign" onchange="selectSig()">
-                    <option value="">Pick Signing Option</option>
-                    <option value="privKey">Private Key</option>
-                    <option value="signature">Signature</option>
-                  </select>
+                  <div>
+                    <input id="to-pub-file" type="file" class="ui primary button" onchange="toPubLoad()"/>
+                  </div>
+              </div>
+              <div class="field">
+                    <label>Amount</label>
+                    <input type="text" id="amount" placeholder="Enter Amount To Transfer">
                 </div>
-                <div class="field" id="signature-input"></div>
-            <div id="acct-err" class="ui center error message">
-            </div>
-            <div>
-                <button id="submit-button" class="ui primary button" disabled >Make Transfer</button>
+                <div id="signature-field" class="inline fields">
+                    <label>Sign with: </label>
+                    <div class="field">
+                      <div class="ui radio checkbox">
+                        <input type="radio" id="priv-option" name="option" value="privkey" tabindex="0" disabled>
+                        <label>Keypair</label>
+                      </div>
+                    </div>
+                    <div class="field">
+                      <div class="ui radio checkbox">
+                        <input type="radio" id="sig-option" name="option" value="signature" tabindex="0" disabled>
+                        <label>Signature</label>
+                      </div>
+                    </div>
+                </div>
+                <div class="field" id="signature-input">
+                  <div id="pub-input" class="field" hidden>
+                      <input type="text" id="from-pub-key" placeholder="Enter From Public Key">
+                  </div>
+                  <div id="priv-input" hidden>
+                    <div>
+                      <input type="text" id="from-priv-key" placeholder="Enter From Private key">
+                    </div>
+                    <div>
+                      <input id="priv-file" type="file" class="ui primary button" onchange="PrivLoad()"/>
+                    </div>
+                  </div>
+                  <div id="sig-input" hidden>
+                    <div id="command-box" class="ui compact message result">
+                      <div class="header" >Command to Sign</div>
+                      <p id="raw-command"></p>
+                    </div>
+                    <input type="text" id="from-signature" placeholder="Enter Signature"></input>
+                  </div>
+                </div>
+            <div id="acct-err" class="ui center error message"></div>
+            <div id="submit-block" >
+                <button id="submit-button" class="ui primary button" disabled>Make Transfer</button>
             </div>
           </form>
-
+          <div id="raw-message" class= "ui compact message hidden"></div>
           <div id="status-box" class="ui compact message result hidden">
               <div id="status-message"></div>
               <div id="request-key"></div>
           </div>
-
     </div>
 </body>
 <style>
-
-.dropdown {
-  margin-bottom: 10px;
-}
-
-.container {
-  text-align: center;
-  margin-top: 20px;
-}
-.result {
- margin-top: 0px;
-}
-.check-button {
-  margin-top: 15px;
-}
-.ui #server {
-  margin-top: 5px;
-  width: 300px;
-}
-.ui #networkId {
-  margin-top: 5px;
-  width: 200px;
-}
-.ui #from-pub-key {
-  margin-top: 5px;
-  width: 300px;
-}
-.ui #to-pub-key {
-  margin-top: 5px;
-  width: 300px;
-}
-.ui #to-account {
-  margin-top: 5px;
-  width: 300px;
-}
-.ui #chain-id {
-  margin-top: 0px;
-  width: 300px;
-}
-.ui #select-signature {
-  margin-top: 0px;
-  width: 300px;
-}
-.ui #from-account {
-  margin-top: 5px;
-  width: 300px;
-}
-.ui #amount {
-  margin-top: 5px;
-  width: 300px;
-}
-.ui #from-priv-key {
-  margin-top: 5px;
-  width: 300px;
-}
-.ui #from-signature {
-  margin-top: 5px;
-  width: 300px;
-}
-.ui #question {
-  margin-top: 5px;
-  width: 300px;
-}
-.ui #account {
-  margin-top: 5px;
-  width: 300px;
-}
-.ui #acct-err {
-  margin-top: 5px;
-  width: 300px;
-  margin: auto;
-  font-size: 13px;
-}
-.ui #to-pub-file{
-  width: 300px;
-  height: 40px;
-}
-.ui #priv-file{
-  width: 300px;
-  height: 40px;
-}
-.ui #load-to-pub{
-  width: 100px;
-  height: 40px;
-}
-table#data-table {
-  margin-left:auto;
-  margin-right:auto;
-}
-table#data-table th{
-  text-align: center;
-  width: 100px;
-}
-table#data-table td{
-  text-align: center;
-  width: 130px;
-}
+  .dropdown {
+    margin-bottom: 10px;
+  }
+  .container {
+    text-align: center;
+    margin-top: 20px;
+  }
+  .result {
+   margin-top: 0px;
+  }
+  .check-button {
+    margin-top: 15px;
+  }
+  .ui #server-field  {
+    margin-top: 5px;
+    width: 300px !important;
+  }
+  #signature-field {
+    margin:auto;
+    width: 260px !important;
+    text-align: : center;
+  }
+  .ui #from-pub-key {
+    margin-top: 5px;
+    width: 300px;
+  }
+  .ui #to-pub-key-div {
+    margin-top: 5px;
+    width: 300px;
+  }
+  .ui #to-account {
+    margin-top: 5px;
+    width: 300px;
+  }
+  .ui #chain-id {
+    margin-top: 0px;
+    width: 300px;
+  }
+  .ui #from-account {
+    margin-top: 5px;
+    width: 300px;
+  }
+  .ui #amount {
+    margin-top: 5px;
+    width: 300px;
+  }
+  .ui #from-priv-key {
+    margin-top: 5px;
+    width: 300px;
+  }
+  .ui #question {
+    margin-top: 5px;
+    width: 300px;
+  }
+  .ui #account {
+    margin-top: 5px;
+    width: 300px;
+  }
+  .ui #acct-err {
+    margin-top: 5px;
+    width: 300px;
+    margin: auto;
+    font-size: 13px;
+  }
+  .ui #priv-file{
+    width: 300px;
+    height: 40px;
+  }
+  .ui #select-signature {
+    margin-top: 0px;
+    width: 300px;
+  }
+  .ui #signature-input{
+    margin-top: 10px;
+  }
+  .ui #from-signature {
+    margin-top: 5px;
+    width: 300px;
+  }
+  .ui #from-account-div {
+    margin-top: 5px;
+    width: 300px !important;
+  }
+  .ui #to-account-div {
+    margin-top: 5px;
+    width: 300px !important;
+  }
+  .ui #to-pub-file{
+    width: 300px;
+    height: 40px;
+  }
+  .ui #submit-block{
+    margin-top: 5px;
+  }
 </style>
 </html>
