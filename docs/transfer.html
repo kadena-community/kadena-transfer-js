@@ -240,11 +240,14 @@
            meta: m,
            networkId: networkId,
        };
-       var c = JSON.stringify(Pact.simple.exec.createCommand( sendCmd.keyPairs, sendCmd.nonce, sendCmd.pactCode,
-                                           sendCmd.envData, sendCmd.meta, sendCmd.networkId))
+       var cmd = Pact.simple.exec.createCommand( sendCmd.keyPairs, sendCmd.nonce, sendCmd.pactCode,
+                                           sendCmd.envData, sendCmd.meta, sendCmd.networkId)
+       console.log(cmd)
+       var c = JSON.stringify(cmd)
+       var hash = cmd.cmds[0].hash
        if (fromPub){
          document.getElementById("raw-command").value = c;
-         document.getElementById("raw-command").textContent = c;
+         document.getElementById("raw-command").textContent = hash;
          document.getElementById("sig-input").hidden=false;
        }
      }
@@ -586,7 +589,9 @@
                       <div class="header" >Command to Sign</div>
                       <p id="raw-command"></p>
                     </div>
-                    <input type="text" id="from-signature" placeholder="Enter Signature"></input>
+                    <div>
+                      <input type="text" id="from-signature" placeholder="Enter Signature"></input>
+                    </div>
                   </div>
                 </div>
             <div id="acct-err" class="ui center error message"></div>
