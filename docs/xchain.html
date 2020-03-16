@@ -200,7 +200,7 @@
         const server = document.getElementById("server").value;
         const networkId = document.getElementById("networkId").textContent
         const host = `https://${server}/chainweb/0.0/${networkId}/chain/${targetChainId}/pact`;
-        const m = Pact.lang.mkMeta("free-x-chain-gas", targetChainId, 0.000000000001, 400, createTime(), 28800);
+        const m = Pact.lang.mkMeta("free-x-chain-gas", targetChainId, 0.000000000001, 300, createTime(), 28800);
         const contCmd = {type: "cont", keyPairs:[],pactId: pactId, rollback: false, step: 1, meta: m, proof: proof, networkId: networkId}
         try {
          const result = await sendNonJson(contCmd, host);
