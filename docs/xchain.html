@@ -1,0 +1,440 @@
+<html>
+<head>
+    <title>Kadena Transfer Tool</title>
+    <script src="https://code.jquery.com/jquery-3.1.1.min.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.js"></script>
+    <script src="pact-lang-api-global.min.js"></script>
+    <script>
+
+     //UTILITY FUNCTIONS
+     const mkReq = (cmd) => {
+         return {
+             headers: {
+                 "Content-Type": "application/json"
+             },
+             method: "POST",
+             body: JSON.stringify(cmd)
+         };
+     };
+
+     const is_hexadecimal = (str) => {
+         const regexp = /^[0-9a-fA-F]+$/;
+         if (regexp.test(str)) return true;
+         else return false;
+     }
+
+     const convertDecimal = (decimal) => {
+       decimal = decimal.toString();
+       if (decimal.includes('.')) { return decimal }
+       if ((decimal / Math.floor(decimal)) === 1) {
+         decimal = decimal + ".0"
+       }
+       return decimal
+     }
+
+     const createTime = () =>  Math.round((new Date).getTime()/1000)-15;
+
+     const checkKey = (key) => {
+         if (key.length !== 64) {
+             throw "Key does not have length of 64";
+         } else if (!is_hexadecimal(key)){
+             throw "Key is not hex string";
+         }
+         return true;
+     }
+
+     const checkSecretKey = (key) => {
+         if (key.length !== 64 && key.length !== 128) {
+             throw "Key does not have the correct length";
+         } else if (!is_hexadecimal(key)){
+             throw "Key is not hex string";
+         }
+         return true;
+     }
+
+    async function getVersion(server){
+      try {
+        const nodeInfo = await fetch(`https://${server}/info`);
+        const nodeInfoJSON = await nodeInfo.json();
+        return nodeInfoJSON.nodeVersion;
+      } catch(e){
+        throw(e)
+      }
+    }
+
+    async function verifyNode(node){
+      return getVersion(node)
+       .then(networkId => {
+          document.getElementById("networkId").classList.remove("red")
+          document.getElementById("networkId").textContent = networkId;
+        })
+       .catch(e => {
+         document.getElementById("networkId").classList.add("red")
+         document.getElementById("networkId").textContent = "Not a Chainweb Node";
+       })
+   }
+
+    //TRANSFER FUNCTIONS
+    const sendNonJson = async function(cmd, apiHost){
+      var c;
+      if (!apiHost) throw new Error(`Pact.fetch.send(): No apiHost provided`);
+      c = Pact.simple.cont.createCommand( cmd.keyPairs, cmd.nonce, cmd.step, cmd.pactId,
+                                            cmd.rollback, cmd.envData, cmd.meta, cmd.proof, cmd.networkId);
+      const txRes = await fetch(`${apiHost}/api/v1/send`, mkReq(c));
+      return txRes;
+    };
+
+    async function findSrcChain(){
+      const pactId = document.getElementById("pact-id").value;
+      const server = document.getElementById("server").value;
+      const networkId = document.getElementById("networkId").textContent
+      const pact = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"].reduce(async (arr, chainId) => {
+        arr = await arr;
+        const host = `https://${server}/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
+        const pactInfo = await Pact.fetch.poll({"requestKeys": [pactId]}, host);
+         if (pactInfo[pactId]) {
+          arr.push({chainId: chainId, tx: pactInfo[pactId]})
+        }
+        return arr;
+      }, [])
+      return pact
+    }
+
+    async function getPact(){
+      let requestKeys = await findSrcChain();
+      document.getElementById("pact-info").hidden = true;
+      if (requestKeys.length === 0){
+        document.getElementById("pact-message").setAttribute("class", "ui compact message");
+        document.getElementById("pact-header").textContent = "Request Key could not be found"
+      } else {
+        try {
+          let source = requestKeys[0].chainId
+          let tx = requestKeys[0].tx;
+          let [sender, receiver, g, target, amount] =  tx.continuation.continuation.args;
+          document.getElementById("pact-message").setAttribute("class", "ui compact message");
+          document.getElementById("pact-header").textContent = "Pact Information"
+          document.getElementById("pact-info").hidden = false;
+          document.getElementById("source-chain-id").textContent = source;
+          document.getElementById("target-chain-id").textContent = target;
+          document.getElementById("sender").textContent = sender
+          document.getElementById("receiver").textContent = receiver
+          document.getElementById("rg").textContent = JSON.stringify(g);
+          document.getElementById("amount").textContent = amount;
+          enableSubmit();
+        } catch(e){
+            document.getElementById("pact-message").setAttribute("class", "ui compact message");
+            document.getElementById("pact-header").textContent = "Not a Cross Chain Request Key"
+        }
+      }
+    }
+
+     var getProof = async function() {
+       const chainId = document.getElementById('source-chain-id').textContent;
+       const targetChainId = document.getElementById("target-chain-id").textContent;
+       const pactId = document.getElementById("pact-id").value;
+       const spvCmd = {"targetChainId": targetChainId, "requestKey": pactId };
+       const server = document.getElementById("server").value;
+       const networkId = document.getElementById("networkId").textContent
+       const host = `https://${server}/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
+       try{
+         const res =  await fetch(`${host}/spv`, mkReq(spvCmd));
+         let foo = await res;
+         if (foo.ok){
+           const proof = await res.json();
+           return proof;
+         } else {
+           const proof = await res.text();
+           throw proof;
+         }
+       } catch(e){
+         throw e;
+       }
+     }
+
+     const handleResult = async function(res) {
+       foo = await res;
+       hideSpinner();
+       if ( foo.ok ) {
+           showStatusBox();
+           j = await res.json();
+           var reqKey = j.requestKeys[0];
+           document.getElementById('status-message').textContent = "Transaction Pending..."
+           document.getElementById('reqkey-box').hidden = false;
+           document.getElementById('request-key').textContent = reqKey;
+           listen();
+       } else {
+           showNegativeStatusBox();
+           t = await res.text();
+           document.getElementById('reqkey-box').hidden = true;
+           document.getElementById('status-message').textContent = t;
+       }
+     }
+
+     async function listen(){
+       document.getElementById('listen-button').disabled=false;
+       showSpinner();
+       const chainId = document.getElementById('target-chain-id').textContent;
+       const server = document.getElementById("server").value;
+       const networkId = document.getElementById("networkId").textContent
+       const reqKey = document.getElementById("request-key").textContent;
+       Pact.fetch.listen({ listen: reqKey }, `https://${server}/chainweb/0.0/${networkId}/chain/${chainId}/pact`)
+           .then(res => {             console.log(res)
+               if (res.result.status === "success") {
+                   document.getElementById('status-message').textContent = "TRANSFER SUCCEEDED"
+                   document.getElementById('status-error').textContent = "";
+               } else {
+                 document.getElementById('status-message').textContent = "TRANSFER FAILED with error"
+                 document.getElementById('status-error').textContent = JSON.stringify(res.result.error.message);
+               }
+           })
+
+     }
+
+    async function finishXChain() {
+      disableSubmit();
+      try {
+        const proof = await getProof();
+        const targetChainId = document.getElementById("target-chain-id").textContent;
+        const pactId = document.getElementById("pact-id").value;
+        const server = document.getElementById("server").value;
+        const networkId = document.getElementById("networkId").textContent
+        const host = `https://${server}/chainweb/0.0/${networkId}/chain/${targetChainId}/pact`;
+        const m = Pact.lang.mkMeta("free-x-chain-gas", targetChainId, 0.00000001, 400, createTime(), 28800);
+        const contCmd = {type: "cont", keyPairs:[],pactId: pactId, rollback: false, step: 1, meta: m, proof: proof, networkId: networkId}
+        try {
+         const result = await sendNonJson(contCmd, host);
+         handleResult(result);
+         document.getElementById("result-message").textContent = JSON.stringify(result);
+       } catch(e){
+         setError(e)
+       }
+      } catch(e){
+        setError(e)
+      }
+    }
+
+    //UI FUNCTIONS
+    function disableSubmit() {
+      document.getElementById('submit-button').disabled = true;
+    }
+
+    function enableSubmit() {
+      document.getElementById('submit-button').disabled = false;
+    }
+
+     $(function() {
+         $('.ui.dropdown').dropdown();
+     });
+
+     function showNegativeStatusBox() {
+         document.getElementById('status-box').setAttribute("class", "ui compact negative message result");
+     }
+
+     function showStatusBox() {
+       document.getElementById('listen-button').disabled=true;
+       document.getElementById('status-box').setAttribute("class", "ui compact message result");
+     }
+
+     function hideStatusBox() {
+         document.getElementById('status-box').setAttribute("class", "ui compact message result hidden");
+     }
+
+     function showSpinner() {
+         //document.getElementById('pending-spinner').setAttribute("class", "ui dimmer active");
+     }
+
+     function hideSpinner() {
+         //document.getElementById('pending-spinner').setAttribute("class", "ui dimmer");
+     }
+
+     function clearError() {
+         document.getElementById("acct-err").innerText = "";
+         document.getElementById("kadena-form").setAttribute("class", "ui form");
+     }
+
+     function setError(msg) {
+       document.getElementById("acct-err").innerText = msg;
+       document.getElementById("kadena-form").setAttribute("class", "ui form error");
+     }
+
+     function hasValue(elId) {
+         v = document.getElementById(elId).value;
+         return v && v.length > 0;
+     }
+
+    function complete(){
+      hideStatusBox();
+      return document.getElementById("networkId").textContent!== "Not a Chainweb Node"
+              && document.getElementById("pact-id").value.length === 43
+    }
+
+   function validateServer() {
+     document.getElementById("server").addEventListener('input', function(event) {
+     clearError();
+     hideStatusBox();
+     try {
+         val = event.srcElement.value;
+         if ( val !== null && val !== "" ) {
+            verifyNode(val).then(() => {
+              if (complete()) getPact()
+              else document.getElementById("pact-message").setAttribute("class", "ui compact message hidden");
+            });
+         }
+     }
+     catch(err) {
+       console.log(err)
+       disableSubmit();
+       setError(err);
+     }
+     }, false);
+   }
+
+   function validatePact() {
+     clearError();
+     hideStatusBox();
+     document.getElementById("pact-id").addEventListener('input', function(event) {
+       val = event.srcElement.value;
+       try {
+         if (complete()) getPact()
+         else document.getElementById("pact-message").setAttribute("class", "ui compact message hidden");
+       }
+       catch(err) {
+         console.log(err)
+         disableSubmit();
+         setError(err);
+       }
+       }, false);
+   }
+
+     // INITIATION FUNCTIONS
+     window.addEventListener('load', function (event) {
+        document.getElementById("server").value = "us-e1.chainweb.com";
+        document.getElementById("networkId").textContent = "mainnet01";
+        validateServer();
+        validatePact();
+        document.getElementById("submit-button").addEventListener('click', async function (event) {
+          event.preventDefault();
+          finishXChain();
+        }, false);
+        document.getElementById("listen-button").addEventListener('click', async function (event) {
+          event.preventDefault();
+          listen();
+        }, false);
+
+     }, false);
+
+    </script>
+</head>
+<body>
+    <div id="main">
+        <div class="ui container">
+            <img src="https://explorer.chainweb.com/static/1lv9xhxyhlqc262kffl55w08ms1cvxsnrv49zhvm0b799dsi0v0i-kadena-k-logo.png" class="center" style="height:70px">
+            <h1>Finish Cross Chain Transfer</h1>
+            <form id ="kadena-form" class="ui form">
+                <div class="field">
+                  <label>Chainweb Server</label>
+                  <div id="server-field" class="ui right labeled input">
+                    <input type="text" id="server" placeholder="Enter Your Node Server">
+                    <label class="ui label" id="networkId"></label>
+                  </div>
+                </div>
+                <div class="field">
+                    <label>Request Key</label>
+                    <input type="text" id="pact-id" placeholder="Enter Request Key">
+                </div>
+            <div id="pact-message" class= "ui compact message hidden">
+              <div class="header" id="pact-header"></div>
+              <ul id="pact-info">
+                <p>Source Chain: <span id="source-chain-id"/></p>
+                <p>Target Chain: <span id="target-chain-id"/></p>
+                <p>Sender: <span id="sender"/></span>
+                <p>Receiver: <span id="receiver"/></span>
+                <p>Receiver Guard: <span id="rg"/></span>
+                <p>Amount: <span id="amount"/></span>
+              </ul>
+            </div>
+            <div id="submit-block" >
+                <button id="submit-button" class="ui primary button" disabled>Finish Cross Chain Transfer</button>
+            </div>
+            <div id="acct-err" class="ui center error message"></div>
+            <div id="result-message" class= "ui compact message hidden">
+            </div>
+          </form>
+          <div id="status-box" class="ui compact message result hidden">
+              <div id="reqkey-box">
+                <div class="header"> Request Key </div>
+                <p id="request-key"/>
+              </div>
+              <br/>
+              <div>
+                <div class="header" id="status-message"></div>
+                <p id="status-error">
+                <button id="listen-button" class="ui button" disabled>Listen Again</button>
+
+              </div>
+
+          </div>
+
+    </div>
+</body>
+<style>
+
+  .dropdown {
+    margin-bottom: 10px;
+  }
+  .container {
+    text-align: center;
+    margin-top: 20px;
+  }
+  .result {
+   margin-top: 0px;
+  }
+  .check-button {
+    margin-top: 15px;
+  }
+  .ui #server-field  {
+    margin-top: 5px;
+    width: 300px !important;
+  }
+  .ui #pact-id {
+    margin-top: 5px;
+    width: 300px;
+  }
+  .ui #target-chain-id {
+    margin-top: 0px;
+    width: 300px;
+  }
+  .ui #source-chain-id {
+    margin-top: 0px;
+    width: 300px;
+  }
+  .ui #account {
+    margin-top: 5px;
+    width: 300px;
+  }
+  .ui #submit-block {
+    margin-top: 5px;
+  }
+  .ui #proof-block {
+    margin-top: 5px;
+  }
+  #proof-message {
+    width: 800px;
+    overflow-wrap: break-word;
+  }
+  #pact-info p{
+    font-weight: bold;
+  }
+  #pact-info{
+    padding: 0 !important;
+  }
+  #pact-info span{
+    font-weight: normal;
+  }
+  #listen-button{
+    margin-top: 10px;
+  }
+
+</style>
+</html>
