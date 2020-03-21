@@ -71,8 +71,7 @@
     }
 
     const checkValidPubKey = async (accountName) => {
-      var e = document.getElementById('chain-id');
-      var chainId = e.options[e.selectedIndex].value
+      var chainId = document.getElementById('to-chain-id').value;
       var server = document.getElementById("server").value
       var networkId = document.getElementById("networkId").textContent
       var host = `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
@@ -83,6 +82,7 @@
          setError("Account name is too long!");
       }
       const acct = await getAccountDetails(accountName, host)
+      console.log(acct)
       try {
         const pubKey = acct.result.data.guard.keys[0]
         if (is_hexadecimal(pubKey) && checkKey(pubKey)) {
@@ -153,6 +153,57 @@
        const txRes = await fetch(`${apiHost}/api/v1/send`, mkReq(c));
        return txRes;
     };
+
+
+     async function initiateXchain(fromAccount, toAccount, toPubKey, pred, amount, fromPub, fromPriv, server, chainId, targetChainId, signature){
+       disableSubmit();
+       m = Pact.lang.mkMeta(fromAccount, chainId, 0.00001, 600, createTime(), 28800);
+       const networkId = document.getElementById("networkId").textContent;
+       host = `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
+       const acct = await getAccountDetails(toAccount, host)
+       console.log(acct.result.data.guard)
+       sendObj = {
+           pactCode: `(coin.transfer-crosschain ${JSON.stringify(fromAccount)} ${JSON.stringify(toAccount)} (read-keyset "ks") ${JSON.stringify(targetChainId)} ${convertDecimal(amount)})`,
+           keyPairs: {publicKey: fromPub, secretKey: fromPriv},
+           meta: m,
+           networkId: networkId,
+           envData: {"ks": acct.result.data.guard},
+           signature: signature
+       };
+       handleResult = async function(res) {
+           foo = await res;
+           hideSpinner();
+           if ( foo.ok ) {
+               showStatusBox();
+               j = await res.json();
+               var reqKey = j.requestKeys[0];
+               document.getElementById('status-message').textContent = "Transaction Pending..."
+               document.getElementById('request-key').textContent = "Request Key: " + reqKey;
+               showSpinner();
+               //do a listen
+               Pact.fetch.listen({ listen: reqKey }, `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`)
+                   .then(res => {
+                       if (res.result.status === "success") {
+                           document.getElementById('status-message').textContent = "TRANSFER SUCCEEDED"
+                       } else {
+                           document.getElementById('status-message').textContent = "TRANSFER FAILED with error: " + res.result.error.message
+                       }
+                   })
+           } else {
+               showNegativeStatusBox();
+               t = await res.text();
+               document.getElementById('status-message').textContent = t;
+           }
+       }
+       sendNonJson(sendObj, host).
+         then(handleResult).catch((e) => {
+             hideSpinner();
+             showNegativeStatusBox();
+             console.log('Caught error');
+             console.log(e);
+             document.getElementById('status-message').textContent = "WRONG INPUTS";
+         })
+     }
 
      async function transfer(fromAccount, toAccount, amount, fromPub, fromPriv, server, chainId, signature){
          //diable button to avoid multiple presses
@@ -226,8 +277,7 @@
      }
 
      var getCommand = function(){
-       const e = document.getElementById('chain-id');
-       const chainId = e.options[e.selectedIndex].value
+       const chainId = document.getElementById('from-chain-id');
        const fromAccount = document.getElementById('from-account').value;
        const toAccount = document.getElementById('to-account').value;
        const m = Pact.lang.mkMeta(fromAccount, chainId, 0.00001, 600, createTime(), 28800);
@@ -315,7 +365,7 @@
     }
 
       function sigComplete(){
-        e = document.getElementById('chain-id');
+        e = document.getElementById('from-chain-id');
         if ( checkAccountName(document.getElementById('from-account').value) &&
              checkValidPubKey(document.getElementById('to-account').value) &&
              checkAmount(document.getElementById('amount').value) &&
@@ -359,7 +409,7 @@
     }
 
     function complete(){
-      e = document.getElementById('chain-id');
+      e = document.getElementById('from-chain-id');
       if ( hasValue('from-account') &&
            hasValue('to-account') &&
            hasValue('amount') &&
@@ -416,6 +466,16 @@
      }, false);
    }
 
+     function xchain(){
+       let to = document.getElementById("to-chain-id").value;
+       let from = document.getElementById("from-chain-id").value;
+       console.log('to', to, "from", from);
+       if (to === "" || from === "") return false;
+       if (to !== from){
+         return true;
+       } else return false;
+     }
+
      // INITIATION FUNCTIONS
      window.addEventListener('load', function (event) {
         document.getElementById("server").value = "us-e1.chainweb.com";
@@ -427,7 +487,13 @@
         validateInput("from-pub-key", checkKey);
         validateInput("from-priv-key", checkSecretKey);
         validateInput("from-signature", checkSignature);
-        document.getElementById("chain-id").addEventListener("change", function(event) {
+        document.getElementById("to-chain-id").addEventListener("change", function(event) {
+          console.log(xchain())
+          setStatus();
+        });
+
+        document.getElementById("from-chain-id").addEventListener("change", function(event) {
+          console.log(xchain())
           setStatus();
         });
 
@@ -448,23 +514,39 @@
      document.addEventListener('click', async function (event) {
          if (!event.target.matches('#submit-button')) return;
          event.preventDefault();
-         var e = document.getElementById('chain-id');
+         var chainId = document.getElementById('from-chain-id');
          var rawPriv = document.getElementById('from-priv-key').value;
          var priv = rawPriv
           ? rawPriv.length===128
             ? rawPriv.slice(0, 64)
             : document.getElementById('from-priv-key').value
           : null;
-         transfer(
-             document.getElementById('from-account').value,
-             document.getElementById('to-account').value,
-             document.getElementById('amount').value,
-             document.getElementById('from-pub-key').value,
-             priv,
-             document.getElementById('server').value,
-             e.options[e.selectedIndex].value,
-             document.getElementById('from-signature').value,
-         )
+          if (xchain()){
+            initiateXchain(
+                document.getElementById('from-account').value,
+                document.getElementById('to-account').value,
+                "",
+                "",
+                document.getElementById('amount').value,
+                document.getElementById('from-pub-key').value,
+                priv,
+                document.getElementById('server').value,
+                document.getElementById('from-chain-id').value,
+                document.getElementById('to-chain-id').value,
+                document.getElementById('from-signature').value
+              )
+          } else {
+           transfer(
+               document.getElementById('from-account').value,
+               document.getElementById('to-account').value,
+               document.getElementById('amount').value,
+               document.getElementById('from-pub-key').value,
+               priv,
+               document.getElementById('server').value,
+               document.getElementById('from-chain-id').value,
+               document.getElementById('from-signature').value,
+           )
+          }
      }, false);
 
 
@@ -530,28 +612,42 @@
                   </div>
                 </div>
                 <div class="field">
-                    <label>Chain ID</label>
+                  <label>FROM Account Name</label>
+                  <div id="from-account-div" class="ui right labeled input">
+                    <input type="text" id="from-account" placeholder="Enter FROM Account Name" >
+                    <select id="from-chain-id" class="ui compact dropdown label">
+                      <option value="" selected>Chain ID</option>
+                      <option value="0">Chain 0</option>
+                      <option value="1">Chain 1</option>
+                      <option value="2">Chain 2</option>
+                      <option value="3">Chain 3</option>
+                      <option value="4">Chain 4</option>
+                      <option value="5">Chain 5</option>
+                      <option value="6">Chain 6</option>
+                      <option value="7">Chain 7</option>
+                      <option value="8">Chain 8</option>
+                      <option value="9">Chain 9</option>
+                    </select>
+                  </div>
                 </div>
-                <select class="ui dropdown" id="chain-id">
-                    <option value="">Chain ID</option>
-                    <option value="0">0</option>
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                    <option value="5">5</option>
-                    <option value="6">6</option>
-                    <option value="7">7</option>
-                    <option value="8">8</option>
-                    <option value="9">9</option>
-                </select>
                 <div class="field">
-                    <label>FROM Account Name</label>
-                    <input type="text" id="from-account" placeholder="Enter From Account Name">
-                </div>
-                <div class="field">
-                    <label>TO Account Name</label>
-                    <input type="text" id="to-account" placeholder="Enter To Account Name">
+                  <label>TO Account Name</label>
+                  <div id="to-account-div" class="ui right labeled input">
+                    <input type="text" id="to-account" placeholder="Enter TO Account Name" >
+                    <select id="to-chain-id" class="ui compact dropdown label">
+                      <option value="" selected>Chain ID</option>
+                      <option value="0">Chain 0</option>
+                      <option value="1">Chain 1</option>
+                      <option value="2">Chain 2</option>
+                      <option value="3">Chain 3</option>
+                      <option value="4">Chain 4</option>
+                      <option value="5">Chain 5</option>
+                      <option value="6">Chain 6</option>
+                      <option value="7">Chain 7</option>
+                      <option value="8">Chain 8</option>
+                      <option value="9">Chain 9</option>
+                    </select>
+                  </div>
                 </div>
                 <div class="field">
                     <label>Amount</label>
@@ -640,16 +736,16 @@
     width: 300px;
   }
   .ui #to-account {
-    margin-top: 5px;
-    width: 300px;
+    /* width: 300px; */
   }
-  .ui #chain-id {
-    margin-top: 0px;
-    width: 300px;
+  .ui #from-chain-id {
+    width: 30px !important;
+  }
+  .ui #to-chain-id {
+    width: 30px;
   }
   .ui #from-account {
-    margin-top: 5px;
-    width: 300px;
+    /* width: 300px; */
   }
   .ui #amount {
     margin-top: 5px;
