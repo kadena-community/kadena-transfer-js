@@ -70,6 +70,44 @@
       return accountName;
     }
 
+
+    const checkToChainId = async (chainId) => {
+      var accountName = document.getElementById('to-account').value;
+      var server = document.getElementById("server").value
+      var networkId = document.getElementById("networkId").textContent
+      var host = `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
+      try {
+        const acct = await getAccountDetails(accountName, host);
+        if (acct.result.status === "success") {
+          setError(`"${accountName}" already exists on chain ${chainId}. Use transfer function instead.`)
+        }
+      } catch(e) {
+        return true;
+      }
+    }
+
+    const checkAccountExists = async (accountName) => {
+      console.log("checkaccount", accountName)
+      var chainId = document.getElementById('to-chain-id').value;
+      var server = document.getElementById("server").value
+      var networkId = document.getElementById("networkId").textContent
+      var host = `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
+      if (accountName.length<3) {
+          setError("Account name is too short!");
+      }
+      if (accountName.length>256) {
+         setError("Account name is too long!");
+      }
+      try {
+        const acct = await getAccountDetails(accountName, host);
+        if (acct.result.status === "success") {
+          setError(`"${accountName}" already exists on chain ${chainId}. Use transfer function instead.`)
+        }
+      } catch(e) {
+        return true;
+      }
+    }
+
     function checkAmount(amount) {
       if (isNaN(Number(amount))) {
         throw "Amount is not a number!";
@@ -108,6 +146,7 @@
           pactCode: `(coin.details ${JSON.stringify(account)})`,
           meta: m
         }, node)
+        return tx;
       } catch(e){
         throw(e)
       }
@@ -157,9 +196,16 @@
              Pact.fetch.listen({ listen: reqKey }, `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`)
                  .then(res => {
                      if (res.result.status === "success") {
+                       if (res.result.continuation) {
+                         document.getElementById('status-message').textContent = "CROSS CHAIN TRANSFER INITIATED"
+                         document.getElementById('xchain-button').disabled = false;
+                         localStorage.setItem("xchain-server", server);
+                         localStorage.setItem("xchain-requestKey", reqKey);
+                       } else {
                          document.getElementById('status-message').textContent = "TRANSFER SUCCEEDED"
+                       }
                      } else {
-                         document.getElementById('status-message').textContent = "TRANSFER FAILED with error: " + res.result.error.message
+                       document.getElementById('status-message').textContent = "TRANSFER FAILED with error: " + res.result.error.message
                      }
                  })
          } else {
@@ -348,7 +394,7 @@
       function sigComplete(){
         e = document.getElementById('from-chain-id');
         if ( checkAccountName(document.getElementById('from-account').value) &&
-             checkAccountName(document.getElementById('to-account').value) &&
+             checkAccountExists(document.getElementById('to-account').value) &&
              checkKey(document.getElementById("to-pub-key").value) &&
              checkAmount(document.getElementById('amount').value) &&
              e.selectedIndex > 0) {
@@ -450,6 +496,25 @@
      }, false);
    }
 
+   function validateChange(elemId, checkInput) {
+     document.getElementById(elemId).addEventListener('change', function(event) {
+     try {
+         enableSubmit();
+         val = event.srcElement.value;
+         clearError();
+         if ( val !== null && val !== "" ) {
+            checkInput(val);
+         }
+         setStatus()
+     }
+     catch(err) {
+       console.log(err)
+       disableSubmit();
+       setError(err);
+     }
+     }, false);
+   }
+
     function xchain(){
       let to = document.getElementById("to-chain-id").value;
       let from = document.getElementById("from-chain-id").value;
@@ -466,21 +531,13 @@
         document.getElementById("networkId").textContent = "mainnet01";
         validateInput("server", verifyNode);
         validateInput("from-account", checkAccountName);
-        validateInput("to-account", checkAccountName);
+        validateInput("to-account", checkAccountExists);
         validateInput("to-pub-key", checkKey);
         validateInput("amount", checkAmount);
         validateInput("from-pub-key", checkKey);
         validateInput("from-priv-key", checkSecretKey);
         validateInput("from-signature", checkSignature);
-        document.getElementById("to-chain-id").addEventListener("change", function(event) {
-          console.log(xchain())
-          setStatus();
-        });
-
-        document.getElementById("from-chain-id").addEventListener("change", function(event) {
-          console.log(xchain())
-          setStatus();
-        });
+        validateChange("to-chain-id", checkToChainId);
 
        document.getElementById("sig-option").addEventListener("input", function(event) {
          selectSig();
@@ -745,6 +802,9 @@
           <div id="status-box" class="ui compact message result hidden">
               <div id="status-message"></div>
               <div id="request-key"></div>
+              <a href="xchain.html">
+                <button id="xchain-button" class="ui primary button" disabled>Finish Transfer</button>
+              </a>
           </div>
     </div>
 </body>
@@ -812,7 +872,7 @@
     width: 300px;
   }
   .ui #acct-err {
-    margin-top: 5px;
+    margin-top: 10px !important;
     width: 300px;
     margin: auto;
     font-size: 13px;

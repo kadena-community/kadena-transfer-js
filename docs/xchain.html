@@ -145,6 +145,7 @@
            return proof;
          } else {
            const proof = await res.text();
+           //Initial Step is not confirmed yet.
            throw proof;
          }
        } catch(e){
@@ -179,10 +180,13 @@
        const networkId = document.getElementById("networkId").textContent
        const reqKey = document.getElementById("request-key").textContent;
        Pact.fetch.listen({ listen: reqKey }, `https://${server}/chainweb/0.0/${networkId}/chain/${chainId}/pact`)
-           .then(res => {             console.log(res)
+           .then(res => {
+             console.log(res)
                if (res.result.status === "success") {
                    document.getElementById('status-message').textContent = "TRANSFER SUCCEEDED"
                    document.getElementById('status-error').textContent = "";
+                   localStorage.removeItem("xchain-requestKey")
+                   localStorage.removeItem("xchain-server")
                } else {
                  document.getElementById('status-message').textContent = "TRANSFER FAILED with error"
                  document.getElementById('status-error').textContent = JSON.stringify(res.result.error.message);
@@ -310,8 +314,17 @@
 
      // INITIATION FUNCTIONS
      window.addEventListener('load', function (event) {
-        document.getElementById("server").value = "us-e1.chainweb.com";
-        document.getElementById("networkId").textContent = "mainnet01";
+        if (localStorage.getItem("xchain-server")){
+         document.getElementById("server").value = localStorage.getItem("xchain-server");
+         verifyNode(localStorage.getItem("xchain-server"));
+        } else {
+          document.getElementById("server").value = "us-e1.chainweb.com";
+          document.getElementById("networkId").textContent = "mainnet01";
+        }
+        if (localStorage.getItem("xchain-requestKey")){
+         document.getElementById("pact-id").value = localStorage.getItem("xchain-requestKey");
+         getPact();
+       }
         validateServer();
         validatePact();
         document.getElementById("submit-button").addEventListener('click', async function (event) {
@@ -372,7 +385,6 @@
                 <div class="header" id="status-message"></div>
                 <p id="status-error">
                 <button id="listen-button" class="ui button" disabled>Listen Again</button>
-
               </div>
 
           </div>

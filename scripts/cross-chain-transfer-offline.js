@@ -9,6 +9,7 @@ const {
   verifyTargetChainGasPayerPublicKeyOffline,
   verifyTargetChainGasPayerPrivateKeyOffline,
   verifyReceiverPublicKeyOffline,
+  verifyReceiverPredicateOffline,
   verifyAmountOffline,
   verifySenderPublicKey,
   verifySenderPrivateKey,
@@ -25,12 +26,12 @@ const {
 const { transferCrosschain } = require("../util/create-cmd.js");
 
 const main = async () => {
- let networkId, chainId, targetChainId, senderAcct, receiverAcct, receiverPublicKey, amount, senderPublicKey, senderPrivateKey,targetChainGasPayerAcct, targetChainGasPayerPublicKey, targetChainGasPayerPrivateKey;
- await runOfflineTransferCrossChain(networkId, chainId, targetChainId, senderAcct, receiverAcct, receiverPublicKey, amount, senderPublicKey, senderPrivateKey)
+ let networkId, chainId, targetChainId, senderAcct, receiverAcct, receiverPublicKey, receiverPredicate, amount, senderPublicKey, senderPrivateKey,targetChainGasPayerAcct, targetChainGasPayerPublicKey, targetChainGasPayerPrivateKey;
+ await runOfflineTransferCrossChain(networkId, chainId, targetChainId, senderAcct, receiverAcct, receiverPublicKey, receiverPredicate, amount, senderPublicKey, senderPrivateKey)
  exit();
 }
 
-async function runOfflineTransferCrossChain(networkId, chainId, targetChainId, senderAcct, receiverAcct, receiverPublicKey, amount, senderPublicKey, senderPrivateKey, targetChainGasPayerAcct, targetChainGasPayerPublicKey, targetChainGasPayerPrivateKey) {
+async function runOfflineTransferCrossChain(networkId, chainId, targetChainId, senderAcct, receiverAcct, receiverPublicKey,receiverPredicate, amount, senderPublicKey, senderPrivateKey, targetChainGasPayerAcct, targetChainGasPayerPublicKey, targetChainGasPayerPrivateKey) {
   let proof;
   networkId = await verifyNetworkId(networkId);
   chainId = await verifyCurrentChainId(chainId);
@@ -40,10 +41,11 @@ async function runOfflineTransferCrossChain(networkId, chainId, targetChainId, s
   senderAcct = await verifySenderAcctOffline(senderAcct);
   receiverAcct = await verifyReceiverAcctOffline(receiverAcct);
   receiverPublicKey = await verifyReceiverPublicKeyOffline(receiverAcct, receiverPublicKey);
+  receiverPredicate = await verifyReceiverPredicateOffline(receiverAcct, receiverPredicate);
   amount = await verifyAmountOffline(senderAcct, receiverAcct, amount);
   targetChainGasPayerAcct = await verifyTargetChainGasPayerOffline(targetChainGasPayerAcct);
   const receiverGuard = {
-    pred: 'keys-all',
+    pred: receiverPredicate,
     keys: [receiverPublicKey]
   }
   await askReviewCrossChain(chainId, targetChainId, senderAcct, receiverAcct, amount, receiverGuard, targetChainGasPayerAcct);
