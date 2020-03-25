@@ -120,15 +120,6 @@ async function verifyReceiverPublicKeyOffline(account, key){
   return key;
 }
 
-async function verifyReceiverPredicateOffline(account, pred){
-  if (!pred) pred = await question(`Enter PREDICATE of the receiver account, "${account}" (press enter if using default, "keys-all"): `)
-  if (pred === "" || pred ==="keys-all") pred = "keys-all"
-  else if (pred === "keys-any") pred = "keys-any"
-  else if (pred === "keys-2") pred = "keys-2"
-  else exitMessage(`${pred} is an invalid keyset predicate`)
-  return pred;
-}
-
 async function verifyReceiverPublicKeyOnline(account, key, accountDetails, chainId, host){
   if (!accountDetails) console.log("Receiver Doesn't exist. You'll create account when you transfer.")
   if (!key) key = await question(`Enter PUBLIC KEY of the receiver account, "${account}": `)
@@ -346,7 +337,6 @@ module.exports = {
   verifyReceiverAcctTransferCreateOnline: verifyReceiverAcctTransferCreateOnline,
   verifyReceiverPublicKeyOnline: verifyReceiverPublicKeyOnline,
   verifyReceiverPublicKeyOffline: verifyReceiverPublicKeyOffline,
-  verifyReceiverPredicateOffline: verifyReceiverPredicateOffline,
   verifyAmountOnline: verifyAmountOnline,
   verifyAmountOffline: verifyAmountOffline,
   verifySenderPublicKey: verifySenderPublicKey,
