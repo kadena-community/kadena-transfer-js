@@ -91,7 +91,7 @@
           setError("account provided is guarded by invalid keypair")
         }
       } catch(e) {
-         setError("to account does not exist on taget chain")
+         setError("to account does not exist on target chain")
       }
     }
 
@@ -184,7 +184,15 @@
                Pact.fetch.listen({ listen: reqKey }, `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`)
                    .then(res => {
                        if (res.result.status === "success") {
+                         console.log
+                         if (res.continuation) {
+                           document.getElementById('status-message').textContent = "CROSS CHAIN TRANSFER INITIATED"
+                           document.getElementById('xchain-div').hidden = false;
+                           localStorage.setItem("xchain-server",server);
+                           localStorage.setItem("xchain-requestKey", reqKey);
+                         } else {
                            document.getElementById('status-message').textContent = "TRANSFER SUCCEEDED"
+                         }
                        } else {
                            document.getElementById('status-message').textContent = "TRANSFER FAILED with error: " + res.result.error.message
                        }
@@ -209,7 +217,7 @@
          //diable button to avoid multiple presses
          disableSubmit();
          const networkId = document.getElementById("networkId").textContent;
-         m = Pact.lang.mkMeta(fromAccount, chainId, 0.00001, 600, createTime(), 28800);
+         m = Pact.lang.mkMeta(fromAccount, chainId, 0.00001, 600, createTime()-60, 28800);
          sendObj = {
              pactCode: `(coin.transfer ${JSON.stringify(fromAccount)} ${JSON.stringify(toAccount)} ${convertDecimal(amount)})`,
              keyPairs: [{publicKey: fromPub, secretKey: fromPriv, clist: [{name: "coin.GAS", args: []}, {name: "coin.TRANSFER", args: [fromAccount, toAccount, parseFloat(amount)]}]}],
@@ -369,7 +377,9 @@
         if ( checkAccountName(document.getElementById('from-account').value) &&
              checkValidPubKey(document.getElementById('to-account').value) &&
              checkAmount(document.getElementById('amount').value) &&
-             e.selectedIndex > 0) {
+             checkToChainId(document.getElementById('to-chain-id').value)&&
+             hasValue('from-chain-id')
+             ) {
              return true;
         } else {
           return false;
@@ -425,7 +435,6 @@
       disableSig();
       disableSubmit();
     }
-
 
      function enableSig(){
       document.getElementById("signature-input").hidden=false;
@@ -487,15 +496,9 @@
         validateInput("from-pub-key", checkKey);
         validateInput("from-priv-key", checkSecretKey);
         validateInput("from-signature", checkSignature);
-        document.getElementById("to-chain-id").addEventListener("change", function(event) {
-          console.log(xchain())
-          setStatus();
-        });
+        validateInput("to-chain-id", xchain);
+        validateInput("from-chain-id", xchain);
 
-        document.getElementById("from-chain-id").addEventListener("change", function(event) {
-          console.log(xchain())
-          setStatus();
-        });
 
        document.getElementById("sig-option").addEventListener("input", function(event) {
          selectSig();
@@ -699,6 +702,9 @@
           <div id="status-box" class="ui compact message result hidden">
               <div id="status-message"></div>
               <div id="request-key"></div>
+              <a id="xchain-div" href="xchain.html" hidden>
+                <button id="xchain-button" class="ui primary button">Finish Transfer</button>
+              </a>
           </div>
 
     </div>
@@ -752,7 +758,6 @@
     width: 300px;
   }
   .ui #from-priv-key {
-    margin-top: 5px;
     width: 300px;
   }
   .ui #question {
@@ -764,7 +769,7 @@
     width: 300px;
   }
   .ui #acct-err {
-    margin-top: 5px;
+    margin-top: 10px !important;
     width: 300px;
     margin: auto;
     font-size: 13px;
