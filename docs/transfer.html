@@ -70,6 +70,30 @@
       return accountName;
     }
 
+    const checkToChainId = async (chainId) => {
+      var accountName = document.getElementById('to-account').value;
+      var server = document.getElementById("server").value
+      var networkId = document.getElementById("networkId").textContent
+      var host = `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
+      if (accountName.length<3) {
+          setError("Account name is too short!");
+      }
+      if (accountName.length>256) {
+         setError("Account name is too long!");
+      }
+      const acct = await getAccountDetails(accountName, host)
+      try {
+        const pubKey = acct.result.data.guard.keys[0]
+        if (is_hexadecimal(pubKey) && checkKey(pubKey)) {
+          return true;
+        } else {
+          setError("account provided is guarded by invalid keypair")
+        }
+      } catch(e) {
+         setError("TO account does not exist on target chain")
+      }
+    }
+
     const checkValidPubKey = async (accountName) => {
       var chainId = document.getElementById('to-chain-id').value;
       var server = document.getElementById("server").value
@@ -456,24 +480,43 @@
       document.getElementById("sig-input").hidden=true;
      }
 
-   function validateInput(elemId, checkInput) {
-     document.getElementById(elemId).addEventListener('input', function(event) {
-     try {
-         enableSubmit();
-         val = event.srcElement.value;
-         clearError();
-         if ( val !== null && val !== "" ) {
-            checkInput(val);
-         }
-         setStatus()
+     function validateInput(elemId, checkInput) {
+       document.getElementById(elemId).addEventListener('input', function(event) {
+       try {
+           enableSubmit();
+           val = event.srcElement.value;
+           clearError();
+           if ( val !== null && val !== "" ) {
+              checkInput(val);
+           }
+           setStatus()
+       }
+       catch(err) {
+         console.log(err)
+         disableSubmit();
+         setError(err);
+       }
+       }, false);
      }
-     catch(err) {
-       console.log(err)
-       disableSubmit();
-       setError(err);
-     }
-     }, false);
-   }
+
+    function validateChange(elemId, checkInput) {
+      document.getElementById(elemId).addEventListener('change', function(event) {
+      try {
+          enableSubmit();
+          val = event.srcElement.value;
+          clearError();
+          if ( val !== null && val !== "" ) {
+             checkInput(val);
+          }
+          setStatus()
+      }
+      catch(err) {
+        console.log(err)
+        disableSubmit();
+        setError(err);
+      }
+      }, false);
+    }
 
      function xchain(){
        let to = document.getElementById("to-chain-id").value;
@@ -496,9 +539,8 @@
         validateInput("from-pub-key", checkKey);
         validateInput("from-priv-key", checkSecretKey);
         validateInput("from-signature", checkSignature);
-        validateInput("to-chain-id", xchain);
-        validateInput("from-chain-id", xchain);
-
+        validateChange("to-chain-id", checkToChainId);
+        validateChange("from-chain-id", xchain);
 
        document.getElementById("sig-option").addEventListener("input", function(event) {
          selectSig();
