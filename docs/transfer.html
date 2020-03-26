@@ -70,55 +70,6 @@
       return accountName;
     }
 
-    const checkToChainId = async (chainId) => {
-      var accountName = document.getElementById('to-account').value;
-      var server = document.getElementById("server").value
-      var networkId = document.getElementById("networkId").textContent
-      var host = `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
-      if (accountName.length<3) {
-          setError("Account name is too short!");
-      }
-      if (accountName.length>256) {
-         setError("Account name is too long!");
-      }
-      const acct = await getAccountDetails(accountName, host)
-      try {
-        const pubKey = acct.result.data.guard.keys[0]
-        if (is_hexadecimal(pubKey) && checkKey(pubKey)) {
-          return true;
-        } else {
-          setError("account provided is guarded by invalid keypair")
-        }
-      } catch(e) {
-         setError("TO account does not exist on target chain")
-      }
-    }
-
-    const checkValidPubKey = async (accountName) => {
-      var chainId = document.getElementById('to-chain-id').value;
-      var server = document.getElementById("server").value
-      var networkId = document.getElementById("networkId").textContent
-      var host = `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
-      if (accountName.length<3) {
-          setError("Account name is too short!");
-      }
-      if (accountName.length>256) {
-         setError("Account name is too long!");
-      }
-      const acct = await getAccountDetails(accountName, host)
-      console.log(acct)
-      try {
-        const pubKey = acct.result.data.guard.keys[0]
-        if (is_hexadecimal(pubKey) && checkKey(pubKey)) {
-          return true;
-        } else {
-          setError("account provided is guarded by invalid keypair")
-        }
-      } catch(e) {
-         setError("to account does not exist on target chain")
-      }
-    }
-
     function checkAmount(amount) {
       if (isNaN(Number(amount))) {
         throw "Amount is not a number!";
@@ -162,6 +113,46 @@
       }
     }
 
+    const checkAccount = async (accountName, chainId, server, networkId) => {
+      var host = `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
+      if (accountName.length<3) {
+          setError("Account name is too short!");
+      }
+      if (accountName.length>256) {
+         setError("Account name is too long!");
+      }
+      const acct = await getAccountDetails(accountName, host)
+      try {
+        if (acct.result.status==="success") return true;
+        else setError("TO account does not exist on target chain. Use transfer and create function instead.")
+      } catch(e) {
+         setError("TO account does not exist on target chain. Use transfer and create function instead.")
+      }
+    }
+
+    const checkToChainId = async (chainId) => {
+      var accountName = document.getElementById('to-account').value;
+      var server = document.getElementById("server").value
+      var networkId = document.getElementById("networkId").textContent
+      checkAccount(accountName, chainId, server, networkId)
+    }
+
+    const checkToAccount = async (accountName) => {
+      var chainId = document.getElementById('to-chain-id').value;
+      var server = document.getElementById("server").value
+      var networkId = document.getElementById("networkId").textContent
+      checkAccount(accountName, chainId, server, networkId)
+    }
+
+     function xchain(){
+       let to = document.getElementById("to-chain-id").value;
+       let from = document.getElementById("from-chain-id").value;
+       if (to === "" || from === "") return false;
+       if (to !== from){
+         return true;
+       } else return false;
+     }
+
     //TRANSFER FUNCTIONS
     const sendNonJson = async function(sendCmd, apiHost){
       var c;
@@ -177,7 +168,6 @@
        const txRes = await fetch(`${apiHost}/api/v1/send`, mkReq(c));
        return txRes;
     };
-
 
      async function initiateXchain(fromAccount, toAccount, toPubKey, pred, amount, fromPub, fromPriv, server, chainId, targetChainId, signature){
        disableSubmit();
@@ -399,7 +389,7 @@
       function sigComplete(){
         e = document.getElementById('from-chain-id');
         if ( checkAccountName(document.getElementById('from-account').value) &&
-             checkValidPubKey(document.getElementById('to-account').value) &&
+             checkToAccount(document.getElementById('to-account').value) &&
              checkAmount(document.getElementById('amount').value) &&
              checkToChainId(document.getElementById('to-chain-id').value)&&
              hasValue('from-chain-id')
@@ -480,27 +470,8 @@
       document.getElementById("sig-input").hidden=true;
      }
 
-     function validateInput(elemId, checkInput) {
-       document.getElementById(elemId).addEventListener('input', function(event) {
-       try {
-           enableSubmit();
-           val = event.srcElement.value;
-           clearError();
-           if ( val !== null && val !== "" ) {
-              checkInput(val);
-           }
-           setStatus()
-       }
-       catch(err) {
-         console.log(err)
-         disableSubmit();
-         setError(err);
-       }
-       }, false);
-     }
-
-    function validateChange(elemId, checkInput) {
-      document.getElementById(elemId).addEventListener('change', function(event) {
+    function validate(elemId, eventName, checkInput) {
+      document.getElementById(elemId).addEventListener(eventName, function(event) {
       try {
           enableSubmit();
           val = event.srcElement.value;
@@ -518,29 +489,19 @@
       }, false);
     }
 
-     function xchain(){
-       let to = document.getElementById("to-chain-id").value;
-       let from = document.getElementById("from-chain-id").value;
-       console.log('to', to, "from", from);
-       if (to === "" || from === "") return false;
-       if (to !== from){
-         return true;
-       } else return false;
-     }
-
      // INITIATION FUNCTIONS
      window.addEventListener('load', function (event) {
         document.getElementById("server").value = "us-e1.chainweb.com";
         document.getElementById("networkId").textContent = "mainnet01";
-        validateInput("server", verifyNode);
-        validateInput("from-account", checkAccountName);
-        validateInput("to-account", checkValidPubKey);
-        validateInput("amount", checkAmount);
-        validateInput("from-pub-key", checkKey);
-        validateInput("from-priv-key", checkSecretKey);
-        validateInput("from-signature", checkSignature);
-        validateChange("to-chain-id", checkToChainId);
-        validateChange("from-chain-id", xchain);
+        validate("server", "input", verifyNode);
+        validate("from-account", "input", checkAccountName);
+        validate("to-account", "input", checkToAccount);
+        validate("amount", "input", checkAmount);
+        validate("from-pub-key", "input", checkKey);
+        validate("from-priv-key", "input", checkSecretKey);
+        validate("from-signature", "input", checkSignature);
+        validate("to-chain-id", "change", checkToChainId);
+        validate("from-chain-id", "change", xchain);
 
        document.getElementById("sig-option").addEventListener("input", function(event) {
          selectSig();
@@ -559,7 +520,6 @@
      document.addEventListener('click', async function (event) {
          if (!event.target.matches('#submit-button')) return;
          event.preventDefault();
-         var chainId = document.getElementById('from-chain-id');
          var rawPriv = document.getElementById('from-priv-key').value;
          var priv = rawPriv
           ? rawPriv.length===128
@@ -840,7 +800,7 @@
     width: 300px !important;
   }
   .ui #submit-block {
-    margin-top: 5px;
+    margin-top: 10px;
   }
   .ui #command-box {
     width:

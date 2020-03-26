@@ -70,27 +70,7 @@
       return accountName;
     }
 
-
-    const checkToChainId = async (chainId) => {
-      var accountName = document.getElementById('to-account').value;
-      var server = document.getElementById("server").value
-      var networkId = document.getElementById("networkId").textContent
-      var host = `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
-      try {
-        const acct = await getAccountDetails(accountName, host);
-        if (acct.result.status === "success") {
-          setError(`"${accountName}" already exists on chain ${chainId}. Use transfer function instead.`)
-        }
-      } catch(e) {
-        return true;
-      }
-    }
-
-    const checkAccountExists = async (accountName) => {
-      console.log("checkaccount", accountName)
-      var chainId = document.getElementById('to-chain-id').value;
-      var server = document.getElementById("server").value
-      var networkId = document.getElementById("networkId").textContent
+    const checkAccount = async (accountName, chainId, server, networkId) => {
       var host = `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
       if (accountName.length<3) {
           setError("Account name is too short!");
@@ -98,14 +78,28 @@
       if (accountName.length>256) {
          setError("Account name is too long!");
       }
+      const acct = await getAccountDetails(accountName, host)
       try {
-        const acct = await getAccountDetails(accountName, host);
-        if (acct.result.status === "success") {
+        if (acct.result.status==="success") {
           setError(`"${accountName}" already exists on chain ${chainId}. Use transfer function instead.`)
-        }
+        } else return true;
       } catch(e) {
-        return true;
+         setError(`"${accountName}" already exists on chain ${chainId}. Use transfer function instead.`)
       }
+    }
+
+    const checkToChainId = async (chainId) => {
+      var accountName = document.getElementById('to-account').value;
+      var server = document.getElementById("server").value
+      var networkId = document.getElementById("networkId").textContent
+      checkAccount(accountName, chainId, server, networkId)
+    }
+
+    const checkToAccount = async (accountName) => {
+      var chainId = document.getElementById('to-chain-id').value;
+      var server = document.getElementById("server").value
+      var networkId = document.getElementById("networkId").textContent
+      checkAccount(accountName, chainId, server, networkId)
     }
 
     function checkAmount(amount) {
@@ -394,7 +388,7 @@
       function sigComplete(){
         e = document.getElementById('from-chain-id');
         if ( checkAccountName(document.getElementById('from-account').value) &&
-             checkAccountExists(document.getElementById('to-account').value) &&
+             checkToAccount(document.getElementById('to-account').value) &&
              checkKey(document.getElementById("to-pub-key").value) &&
              checkAmount(document.getElementById('amount').value) &&
              e.selectedIndex > 0) {
@@ -531,7 +525,7 @@
         document.getElementById("networkId").textContent = "mainnet01";
         validateInput("server", verifyNode);
         validateInput("from-account", checkAccountName);
-        validateInput("to-account", checkAccountExists);
+        validateInput("to-account", checkToAccount);
         validateInput("to-pub-key", checkKey);
         validateInput("amount", checkAmount);
         validateInput("from-pub-key", checkKey);
@@ -905,7 +899,7 @@
     height: 40px;
   }
   .ui #submit-block{
-    margin-top: 5px;
+    margin-top: 10px;
   }
 </style>
 </html>
