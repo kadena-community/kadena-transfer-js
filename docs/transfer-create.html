@@ -92,14 +92,16 @@
       var accountName = document.getElementById('to-account').value;
       var server = document.getElementById("server").value
       var networkId = document.getElementById("networkId").textContent
-      checkAccount(accountName, chainId, server, networkId)
+      if (xchain()) checkAccount(accountName, chainId, server, networkId)
+      else checkAccountName(accountName);
     }
 
     const checkToAccount = async (accountName) => {
       var chainId = document.getElementById('to-chain-id').value;
       var server = document.getElementById("server").value
       var networkId = document.getElementById("networkId").textContent
-      checkAccount(accountName, chainId, server, networkId)
+      if (xchain()) checkAccount(accountName, chainId, server, networkId)
+      else checkAccountName(accountName);
     }
 
     function checkAmount(amount) {
