@@ -299,7 +299,7 @@
      }
 
      var getCommand = function(){
-       const chainId = document.getElementById('from-chain-id');
+       const chainId = document.getElementById('from-chain-id').value;
        const fromAccount = document.getElementById('from-account').value;
        const toAccount = document.getElementById('to-account').value;
        const m = Pact.lang.mkMeta(fromAccount, chainId, 0.00001, 600, createTime(), 28800);

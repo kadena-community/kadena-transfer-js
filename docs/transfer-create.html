@@ -471,27 +471,8 @@
       document.getElementById("sig-input").hidden=true;
      }
 
-   function validateInput(elemId, checkInput) {
-     document.getElementById(elemId).addEventListener('input', function(event) {
-     try {
-         enableSubmit();
-         val = event.srcElement.value;
-         clearError();
-         if ( val !== null && val !== "" ) {
-            checkInput(val);
-         }
-         setStatus()
-     }
-     catch(err) {
-       console.log(err)
-       disableSubmit();
-       setError(err);
-     }
-     }, false);
-   }
-
-   function validateChange(elemId, checkInput) {
-     document.getElementById(elemId).addEventListener('change', function(event) {
+   function validate(elemId, eventName, checkInput) {
+     document.getElementById(elemId).addEventListener(eventName, function(event) {
      try {
          enableSubmit();
          val = event.srcElement.value;
@@ -523,15 +504,16 @@
      window.addEventListener('load', function (event) {
         document.getElementById("server").value = "us-e1.chainweb.com";
         document.getElementById("networkId").textContent = "mainnet01";
-        validateInput("server", verifyNode);
-        validateInput("from-account", checkAccountName);
-        validateInput("to-account", checkToAccount);
-        validateInput("to-pub-key", checkKey);
-        validateInput("amount", checkAmount);
-        validateInput("from-pub-key", checkKey);
-        validateInput("from-priv-key", checkSecretKey);
-        validateInput("from-signature", checkSignature);
-        validateChange("to-chain-id", checkToChainId);
+        validate("server", "input", verifyNode);
+        validate("from-account", "input", checkAccountName);
+        validate("to-account", "input", checkToAccount);
+        validate("to-pub-key", "input", checkKey);
+        validate("amount", "input", checkAmount);
+        validate("from-pub-key","input",  checkKey);
+        validate("from-priv-key", "input", checkSecretKey);
+        validate("from-signature","input", checkSignature);
+        validate("to-chain-id", "change", checkToChainId);
+        validate("from-chain-id", "change", xchain);
 
        document.getElementById("sig-option").addEventListener("input", function(event) {
          selectSig();
