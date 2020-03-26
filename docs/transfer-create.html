@@ -192,8 +192,8 @@
                      if (res.result.status === "success") {
                        if (res.result.continuation) {
                          document.getElementById('status-message').textContent = "CROSS CHAIN TRANSFER INITIATED"
-                         document.getElementById('xchain-button').disabled = false;
-                         localStorage.setItem("xchain-server", server);
+                         document.getElementById('xchain-div').hidden = false;
+                         localStorage.setItem("xchain-server",server);
                          localStorage.setItem("xchain-requestKey", reqKey);
                        } else {
                          document.getElementById('status-message').textContent = "TRANSFER SUCCEEDED"
