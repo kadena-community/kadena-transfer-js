@@ -108,6 +108,18 @@
       }
     }
 
+    const checkFromChainId = async (chainId) => {
+      var toChainId = document.getElementById('to-chain-id').value
+      var accountName = document.getElementById('to-account').value;
+      var server = document.getElementById("server").value
+      var networkId = document.getElementById("networkId").textContent
+      if (xchain()) checkAccount(accountName, toChainId, server, networkId)
+      else if (document.getElementById('from-account').value === accountName &&
+               chainId === toChainId){
+       setSigError("You cannot transfer to the same account")
+      }
+    }
+
     const checkToAccount = async (accountName) => {
       var chainId = document.getElementById('to-chain-id').value;
       var server = document.getElementById("server").value
@@ -410,6 +422,7 @@
        resetSig();
        document.getElementById("acct-err").innerText = msg;
        document.getElementById("kadena-form").setAttribute("class", "ui form error");
+       throw msg
      }
 
 
@@ -436,19 +449,16 @@
         }
       }
 
-      function sigComplete(){
+      async function sigComplete(){
         try {
-          if ( checkAccountName(document.getElementById('from-account').value) &&
-               checkAccountName(document.getElementById('to-account').value) &&
-               checkToAccount(document.getElementById('to-account').value) &&
-               checkKey(document.getElementById("to-pub-key").value) &&
-               checkAmount(document.getElementById('amount').value) &&
-               checkToChainId(document.getElementById('to-chain-id').value)&&
-               hasValue('from-chain-id')) {
-               return true;
-          } else {
-            return false;
-          }
+           checkAccountName(document.getElementById('from-account').value) &&
+           checkAccountName(document.getElementById('to-account').value) &&
+           await checkToAccount(document.getElementById('to-account').value) &&
+           checkKey(document.getElementById("to-pub-key").value) &&
+           checkAmount(document.getElementById('amount').value) &&
+           await checkToChainId(document.getElementById('to-chain-id').value)&&
+           await checkFromChainId(document.getElementById('from-chain-id').value)) {
+           return true;
         } catch(e){
           resetSig();
         }
@@ -569,7 +579,7 @@
         validate("from-priv-key", "input", checkSecretKey);
         validate("from-signature","input", checkSignature);
         validate("to-chain-id", "change", checkToChainId);
-        validate("from-chain-id", "change", xchain);
+        validate("from-chain-id", "change", checkFromChainId);
 
        document.getElementById("sig-option").addEventListener("input", function(event) {
          selectSig();

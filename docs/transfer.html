@@ -147,6 +147,18 @@
       }
     }
 
+    const checkFromChainId = async (chainId) => {
+      var toChainId = document.getElementById('to-chain-id').value
+      var accountName = document.getElementById('to-account').value;
+      var server = document.getElementById("server").value
+      var networkId = document.getElementById("networkId").textContent
+      if (xchain()) checkAccount(accountName, toChainId, server, networkId)
+      else if (document.getElementById('from-account').value === accountName &&
+               chainId === toChainId){
+       setSigError("You cannot transfer to the same account")
+      }
+    }
+
     const checkToAccount = async (accountName) => {
       var chainId = document.getElementById('to-chain-id').value;
       var server = document.getElementById("server").value
@@ -332,6 +344,7 @@
        const acct = await getAccountDetails(toAccount, host)
        const targetChainId = document.getElementById('to-chain-id').value;
        console.log(acct.result.data.guard)
+       console.log(acct.result.data.guard)
        var sendCmd;
        if (xchain()){
          sendCmd = {
@@ -408,9 +421,10 @@
      }
 
     function setSigError(msg) {
-      resetSig();
       document.getElementById("acct-err").innerText = msg;
       document.getElementById("kadena-form").setAttribute("class", "ui form error");
+      resetSig();
+      throw msg
     }
 
      function hasValue(elId) {
@@ -436,20 +450,17 @@
       }
     }
 
-      function sigComplete(){
+      async function sigComplete(){
         try{
-          if ( checkAccountName(document.getElementById('from-account').value) &&
-              checkAccountName(document.getElementById('to-account').value) &&
-               checkToAccount(document.getElementById('to-account').value) &&
-               checkAmount(document.getElementById('amount').value) &&
-               checkToChainId(document.getElementById('to-chain-id').value)&&
-               hasValue('from-chain-id')
-               ) {
-               return true;
-          } else {
-            return false;
-          }
+          checkAccountName(document.getElementById('from-account').value)
+          checkAccountName(document.getElementById('to-account').value)
+          await checkToAccount(document.getElementById('to-account').value)
+          checkAmount(document.getElementById('amount').value)
+          await checkToChainId(document.getElementById('to-chain-id').value)
+          await checkFromChainId(document.getElementById('to-chain-id').value)
+          return true;
         }catch(e){
+          console.log(e)
           resetSig();
         }
 
@@ -509,12 +520,14 @@
     }
 
      function enableSig(){
+       console.log("enablesig")
        document.getElementById("sig-option").disabled = false;
        document.getElementById("priv-option").disabled = false;
        document.getElementById("signature-input").hidden=false;
      }
 
      function disableSig(){
+       console.log("disablesis")
       document.getElementById("raw-command").value = "";
       document.getElementById("raw-command").textContent = "";
       document.getElementById("sig-option").checked=false;
@@ -558,7 +571,7 @@
         validate("from-priv-key", "input", checkSecretKey);
         validate("from-signature", "input", checkSignature);
         validate("to-chain-id", "change", checkToChainId);
-        validate("from-chain-id", "change", xchain);
+        validate("from-chain-id", "change", checkFromChainId);
 
        document.getElementById("sig-option").addEventListener("input", function(event) {
          selectSig();
