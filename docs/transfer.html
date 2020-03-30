@@ -33,7 +33,7 @@
        return decimal
      }
 
-     const createTime = () =>  Math.round((new Date).getTime()/1000)-15;
+     const createTime = () =>  Math.round((new Date).getTime()/1000)-60;
 
      const checkKey = (key) => {
          if (key.length !== 64) {
@@ -89,6 +89,7 @@
     }
 
     function verifyNode(node){
+      resetSig();
       getVersion(node)
        .then(networkId => {
           document.getElementById("networkId").classList.remove("red")
@@ -115,18 +116,17 @@
 
     const checkAccount = async (accountName, chainId, server, networkId) => {
       var host = `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
-      if (accountName.length<3) {
-          setError("Account name is too short!");
-      }
-      if (accountName.length>256) {
-         setError("Account name is too long!");
+      try {
+        checkAccountName(accountName);
+      } catch(e){
+        setSigError(e)
       }
       const acct = await getAccountDetails(accountName, host)
       try {
         if (acct.result.status==="success") return true;
-        else setError("TO account does not exist on target chain. Use transfer and create function instead.")
+        else setSigError("TO account does not exist on target chain. Use transfer and create function instead.")
       } catch(e) {
-         setError("TO account does not exist on target chain. Use transfer and create function instead.")
+         setSigError("TO account does not exist on target chain. Use transfer and create function instead.")
       }
     }
 
@@ -134,14 +134,34 @@
       var accountName = document.getElementById('to-account').value;
       var server = document.getElementById("server").value
       var networkId = document.getElementById("networkId").textContent
-      checkAccount(accountName, chainId, server, networkId)
+      if (xchain()) checkAccount(accountName, chainId, server, networkId)
+      else if (document.getElementById('from-account').value === accountName &&
+               document.getElementById('from-chain-id').value === chainId){
+       setSigError("You cannot transfer to the same account")
+      } else {
+        try {
+         checkAccountName(accountName);
+       } catch(e){
+         setSigError(e)
+       }
+      }
     }
 
     const checkToAccount = async (accountName) => {
       var chainId = document.getElementById('to-chain-id').value;
       var server = document.getElementById("server").value
       var networkId = document.getElementById("networkId").textContent
-      checkAccount(accountName, chainId, server, networkId)
+      if (xchain()) checkAccount(accountName, chainId, server, networkId)
+      else if (document.getElementById('from-account').value === accountName &&
+               document.getElementById('from-chain-id').value === chainId){
+        setSigError("You cannot transfer to the same account")
+      } else {
+        try {
+         checkAccountName(accountName);
+       } catch(e){
+         setSigError(e)
+       }
+      }
     }
 
      function xchain(){
@@ -198,7 +218,6 @@
                Pact.fetch.listen({ listen: reqKey }, `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`)
                    .then(res => {
                        if (res.result.status === "success") {
-                         console.log
                          if (res.continuation) {
                            document.getElementById('status-message').textContent = "CROSS CHAIN TRANSFER INITIATED"
                            document.getElementById('xchain-div').hidden = false;
@@ -298,7 +317,7 @@
        } else return false;
      }
 
-     var getCommand = function(){
+     var getCommand = async function(){
        const chainId = document.getElementById('from-chain-id').value;
        const fromAccount = document.getElementById('from-account').value;
        const toAccount = document.getElementById('to-account').value;
@@ -306,12 +325,28 @@
        const amount = document.getElementById('amount').value;
        const networkId = document.getElementById("networkId").textContent;
        const fromPub = document.getElementById('from-pub-key').value;
-       const sendCmd = {
-           pactCode: `(coin.transfer ${JSON.stringify(fromAccount)} ${JSON.stringify(toAccount)} ${convertDecimal(amount)})`,
-           keyPairs: [{publicKey: fromPub, secretKey: null, clist: [{name: "coin.GAS", args: []}, {name: "coin.TRANSFER", args: [fromAccount, toAccount, parseFloat(amount)]}]}],
-           meta: m,
-           networkId: networkId,
-       };
+       const server = document.getElementById('server').value;
+       host = `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
+       const acct = await getAccountDetails(toAccount, host)
+       const targetChainId = document.getElementById('to-chain-id').value;
+       console.log(acct.result.data.guard)
+       var sendCmd;
+       if (xchain()){
+         sendCmd = {
+            pactCode: `(coin.transfer-crosschain ${JSON.stringify(fromAccount)} ${JSON.stringify(toAccount)} (read-keyset "ks") ${JSON.stringify(targetChainId)} ${convertDecimal(amount)})`,
+            keyPairs: [{publicKey: fromPub, secretKey: null}],
+            meta: m,
+            networkId: networkId,
+            envData: {"ks": acct.result.data.guard},
+        };
+      } else {
+        sendCmd = {
+            pactCode: `(coin.transfer ${JSON.stringify(fromAccount)} ${JSON.stringify(toAccount)} ${convertDecimal(amount)})`,
+            keyPairs: [{publicKey: fromPub, secretKey: null, clist: [{name: "coin.GAS", args: []}, {name: "coin.TRANSFER", args: [fromAccount, toAccount, parseFloat(amount)]}]}],
+            meta: m,
+            networkId: networkId,
+        };
+      }
        var cmd = Pact.simple.exec.createCommand( sendCmd.keyPairs, sendCmd.nonce, sendCmd.pactCode,
                                            sendCmd.envData, sendCmd.meta, sendCmd.networkId)
        console.log(cmd)
@@ -337,6 +372,12 @@
          $('.ui.dropdown').dropdown();
      });
 
+     function clearStatusBox() {
+        document.getElementById('status-box').setAttribute("class", "ui compact message result hidden");
+        document.getElementById('status-message').textContent = ""
+        document.getElementById('request-key').textContent = ""
+     }
+
      function showNegativeStatusBox() {
          document.getElementById('status-box').setAttribute("class", "ui compact negative message result");
      }
@@ -359,9 +400,16 @@
      }
 
      function setError(msg) {
+       disableSubmit();
        document.getElementById("acct-err").innerText = msg;
        document.getElementById("kadena-form").setAttribute("class", "ui form error");
      }
+
+    function setSigError(msg) {
+      resetSig();
+      document.getElementById("acct-err").innerText = msg;
+      document.getElementById("kadena-form").setAttribute("class", "ui form error");
+    }
 
      function hasValue(elId) {
          v = document.getElementById(elId).value;
@@ -387,17 +435,22 @@
     }
 
       function sigComplete(){
-        e = document.getElementById('from-chain-id');
-        if ( checkAccountName(document.getElementById('from-account').value) &&
-             checkToAccount(document.getElementById('to-account').value) &&
-             checkAmount(document.getElementById('amount').value) &&
-             checkToChainId(document.getElementById('to-chain-id').value)&&
-             hasValue('from-chain-id')
-             ) {
-             return true;
-        } else {
-          return false;
+        try{
+          if ( checkAccountName(document.getElementById('from-account').value) &&
+              checkAccountName(document.getElementById('to-account').value) &&
+               checkToAccount(document.getElementById('to-account').value) &&
+               checkAmount(document.getElementById('amount').value) &&
+               checkToChainId(document.getElementById('to-chain-id').value)&&
+               hasValue('from-chain-id')
+               ) {
+               return true;
+          } else {
+            return false;
+          }
+        }catch(e){
+          resetSig();
         }
+
       }
 
       function allComplete(){
@@ -418,7 +471,8 @@
       if (hasValue('from-priv-key')) {
         if (checkKey(document.getElementById('from-pub-key').value)) return true;
       } else if (hasValue("from-signature")){
-        if (checkKey(document.getElementById('from-pub-key').value)) return true;
+        if (checkKey(document.getElementById('from-pub-key').value)
+        && checkSignature(document.getElementById('from-signature').value)) return true;
       } else{
         return false
       }
@@ -433,12 +487,13 @@
     }
 
     function complete(){
-      e = document.getElementById('from-chain-id');
+      console.log("complete called")
       if ( hasValue('from-account') &&
            hasValue('to-account') &&
            hasValue('amount') &&
            hasValue('server') &&
-           e.selectedIndex > 0 ) {
+           hasValue('from-chain-id') &&
+           hasValue('to-chain-id') ) {
         return true;
       } else {
         return false;
@@ -446,14 +501,16 @@
     }
 
     function resetSig(){
+      clearStatusBox()
       disableSig();
       disableSubmit();
     }
 
      function enableSig(){
-      document.getElementById("signature-input").hidden=false;
-      document.getElementById("sig-option").disabled = false;
-      document.getElementById("priv-option").disabled = false;
+       document.getElementById("sig-option").disabled = false;
+       document.getElementById("priv-option").disabled = false;
+       document.getElementById("sig-option").checked=false;
+       document.getElementById("priv-option").checked=false;
      }
 
      function disableSig(){
@@ -474,19 +531,18 @@
       document.getElementById(elemId).addEventListener(eventName, function(event) {
       try {
           enableSubmit();
-          val = event.srcElement.value;
           clearError();
+          val = event.srcElement.value;
           if ( val !== null && val !== "" ) {
-             checkInput(val);
+            checkInput(val);
           }
           setStatus()
       }
       catch(err) {
         console.log(err)
-        disableSubmit();
         setError(err);
-      }
-      }, false);
+        setStatus()
+      }}, false);
     }
 
      // INITIATION FUNCTIONS
@@ -526,6 +582,7 @@
             ? rawPriv.slice(0, 64)
             : document.getElementById('from-priv-key').value
           : null;
+          console.log(xchain())
           if (xchain()){
             initiateXchain(
                 document.getElementById('from-account').value,
@@ -570,7 +627,7 @@
              var textFromFileLoaded = fileLoadedEvent.target.result;
              var keys = textFromFileLoaded.split("\n");
              document.getElementById("from-pub-key").value = keys[0].replace("public: ", "");
-             document.getElementById("from-priv-key").value = keys[1].replace("secret: ", "");                setStatus();
+             document.getElementById("from-priv-key").value = keys[1].replace("secret: ", "");
              setStatus();
          };
          fileReader.readAsText(fileToLoad, "UTF-8");

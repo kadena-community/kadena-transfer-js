@@ -88,7 +88,8 @@
     async function findSrcChain(){
       const pactId = document.getElementById("pact-id").value;
       const server = document.getElementById("server").value;
-      const networkId = document.getElementById("networkId").textContent
+      const networkId = document.getElementById("networkId").textContent;
+      console.log(networkId)
       const pact = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"].reduce(async (arr, chainId) => {
         arr = await arr;
         const host = `https://${server}/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
@@ -149,7 +150,7 @@
            throw proof;
          }
        } catch(e){
-         throw e;
+         throw "Initial transfer is not confirmed yet. Please wait and try again."
        }
      }
 
@@ -312,19 +313,22 @@
        }, false);
    }
 
+
+
      // INITIATION FUNCTIONS
      window.addEventListener('load', function (event) {
         if (localStorage.getItem("xchain-server")){
          document.getElementById("server").value = localStorage.getItem("xchain-server");
-         verifyNode(localStorage.getItem("xchain-server"));
+         verifyNode(localStorage.getItem("xchain-server")).then(() => {
+           if (localStorage.getItem("xchain-requestKey")){
+              document.getElementById("pact-id").value = localStorage.getItem("xchain-requestKey");
+              getPact();
+            }
+         });
         } else {
           document.getElementById("server").value = "us-e1.chainweb.com";
           document.getElementById("networkId").textContent = "mainnet01";
         }
-        if (localStorage.getItem("xchain-requestKey")){
-         document.getElementById("pact-id").value = localStorage.getItem("xchain-requestKey");
-         getPact();
-       }
         validateServer();
         validatePact();
         document.getElementById("submit-button").addEventListener('click', async function (event) {
