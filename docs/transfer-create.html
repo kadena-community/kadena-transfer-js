@@ -451,14 +451,19 @@
 
       async function sigComplete(){
         try {
-           checkAccountName(document.getElementById('from-account').value) &&
-           checkAccountName(document.getElementById('to-account').value) &&
-           await checkToAccount(document.getElementById('to-account').value) &&
-           checkKey(document.getElementById("to-pub-key").value) &&
-           checkAmount(document.getElementById('amount').value) &&
-           await checkToChainId(document.getElementById('to-chain-id').value)&&
-           await checkFromChainId(document.getElementById('from-chain-id').value)) {
-           return true;
+          let check1 = await  checkToAccount(document.getElementById('to-account').value)
+          let check2 = await checkToChainId(document.getElementById('to-chain-id').value)
+          let check3 = await checkFromChainId(document.getElementById('to-chain-id').value)
+          if ( checkAccountName(document.getElementById('from-account').value) &&
+               checkAccountName(document.getElementById('to-account').value) &&
+               checkKey(document.getElementById("to-pub-key").value) &&
+               checkAmount(document.getElementById('amount').value) &&
+               check1 && check2 && check3
+             ) {
+               return true;
+          } else {
+            return false;
+          }
         } catch(e){
           resetSig();
         }
@@ -535,6 +540,9 @@
       document.getElementById("from-priv-key").value =""
       document.getElementById("from-signature").value =""
       document.getElementById("signature-input").hidden=true;
+      document.getElementById("sig-input").hidden=true;
+      document.getElementById("pub-input").hidden=true;
+      document.getElementById("priv-input").hidden=true;
       document.getElementById("sig-input").hidden=true;
      }
 
