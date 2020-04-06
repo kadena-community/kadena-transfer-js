@@ -204,7 +204,7 @@
         const server = document.getElementById("server").value;
         const networkId = document.getElementById("networkId").textContent
         const host = `https://${server}/chainweb/0.0/${networkId}/chain/${targetChainId}/pact`;
-        const gasStation = networkId==="mainnet01" ? "free-x-chain-gas" : "free-x-chain-gas-0"
+        const gasStation = "free-x-chain-gas";
         const m = Pact.lang.mkMeta(gasStation, targetChainId, 0.000000000001, 300, createTime(), 28800);
         const contCmd = {type: "cont", keyPairs:[],pactId: pactId, rollback: false, step: 1, meta: m, proof: proof, networkId: networkId}
         try {
