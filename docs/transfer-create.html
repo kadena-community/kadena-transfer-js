@@ -1,13 +1,225 @@
 <html>
 <head>
     <title>Kadena Transfer Tool</title>
+    <link rel="icon" href="https://explorer.chainweb.com/static/img/favicon/0d63dkd822sxczcy51lbhqgflzdxw6lhgf88x2j7kc55hcpk120y-favicon-96x96.png">
     <script src="https://code.jquery.com/jquery-3.1.1.min.js" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
     <script src="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.js"></script>
-    <script src="pact-lang-api-global.min.js"></script>
-    <script>
+    <script src="https://cdn.jsdelivr.net/npm/pact-lang-api@4.1.2/pact-lang-api-global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-     //UTILITY FUNCTIONS
+    <script>
+      //Form Validation
+     $(document).ready(function(){
+
+       // custom form validation rule
+       $.fn.form.settings.rules.validSig = function(sig) {
+         if (sig.length === 128 && !isPriv(sig)) {
+           return validateSig(sig);
+         }
+         else return true;
+       };
+
+       $.fn.form.settings.rules.validPriv = function(sig) {
+         if (sig.length === 128 && isPriv(sig)){
+           return validatePriv(sig.slice(0,64))
+         } else if (sig.length === 64) {
+           return validatePriv(sig);
+         }
+         else return true;
+       };
+
+        $.fn.form.settings.rules.validEntry = function(sig) {
+          if (sig.length === 128 || sig.length === 64) {
+            return true;
+          } else if (sig.length === 0){
+            if (document.getElementById("hash-string").innerText === ""){
+              return true;
+            } else return false;
+          }
+          else return false;
+        };
+
+       $.fn.form.settings.rules.checkKeyLength= function(key) {
+         if (document.getElementById("receiver-select").hidden === false){
+           if (document.getElementById("basic").classList.contains( 'active' )){
+             return key.length===64;
+           }
+           else return true;
+         }
+         else {
+           return true;
+         }
+       };
+
+       $.fn.form.settings.rules.checkCustomKeyLength= function(guard) {
+       if (document.getElementById("custom").classList.contains('active')){
+          guard = JSON.parse(guard);
+          if (guard.keys.length === 0) return false;
+          let validKey = guard.keys.filter(key => {
+            return key.length===64;
+          })
+          return validKey.length === guard.keys.length;
+        } else return true;
+      }
+
+       $.fn.form.settings.rules.checkPredicate = function(key) {
+         if (document.getElementById("receiver-select").hidden === false){
+           if (document.getElementById("custom").classList.contains( 'active' )){
+              let guard = JSON.parse(document.getElementById("custom-guard").value);
+              return (guard.pred === "keys-all" || guard.pred === "keys-any" || guard.pred === "keys-2");
+           } else return true;
+         }
+         else {
+           return true;
+         }
+       };
+
+       $.fn.form.settings.rules.checkKeyset = function(keyset) {
+         if (document.getElementById("receiver-exist").hidden === false){
+           keyset = JSON.parse(keyset)
+           if (validateKeyset(keyset)) return true;
+           else if (!!keyset.keysetref) return true;
+           else return false;
+         } else return true;
+       }
+
+       $('#kadena-form')
+         .form({
+           on: 'blur',
+           fields: {
+             server: {
+               identifier  : 'server',
+               rules: [
+                 {
+                   type   : 'empty',
+                   prompt : 'Please enter a node server'
+                 }
+               ]
+             },
+             signature: {
+               identifier  : 'signature',
+               rules: [
+                 {
+                   type   : 'validSig',
+                   prompt : 'Signature is invalid. Please check again'
+                 },
+                 {
+                   type   : 'validPriv',
+                   prompt : 'Private Key is invalid. Please check again'
+                 },
+                 {
+                   type   : 'validEntry',
+                   prompt : 'Length does not match a Private key or a Signature. Please check again'
+                 }
+               ]
+             },
+             fromAccount: {
+               identifier  : 'fromAccount',
+               rules: [
+                 {
+                   type   : 'minLength[3]',
+                 },
+                 {
+                   type   : 'maxLength[256]',
+                 }
+               ]
+             },
+             toAccount: {
+               identifier  : 'toAccount',
+               rules: [
+                 {
+                   type   : 'maxLength[256]',
+                 },
+                 {
+                   type   : 'minLength[3]',
+                 }
+               ]
+             },
+             toAccountPublicKey: {
+               identifier : 'basicPublicKey',
+               rules : [
+                 {
+                   type: 'checkKeyLength',
+                   prompt: 'Length does not match a Public Key'
+                 },
+                 {
+                   type: 'checkPredicate',
+                   prompt: 'Keyset Predicate is Invalid'
+                 }
+               ]
+             },
+             toAccountGuard: {
+               identifier : 'custom-guard',
+               rules : [
+                 {
+                   type: 'checkCustomKeyLength',
+                   prompt: 'Length does not match a Public Key'
+                 },
+                 {
+                   type: 'checkPredicate',
+                   prompt: 'Keyset Predicate is Invalid'
+                 }
+               ]
+             },
+             existingGuard: {
+               identifier : 'receiver-keyset-fixed',
+               rules : [
+                 {
+                   type: 'checkKeyset',
+                   prompt: 'Transferring to the receiver is not supported.'
+                 }
+               ]
+             },
+             amount: {
+               identifier  : 'amount',
+               rules: [
+                 {
+                   type   : 'decimal[<0]',
+                 }
+               ]
+             }
+           },
+           inline : true,
+           onSuccess(e){
+             e.preventDefault();
+             const {fromAccount, toAccount, fromChainId, toChainId} = getInputs();
+             if (!isCrossChain(fromChainId, toChainId) && (fromAccount === toAccount)){
+               setError("Sender Account is the Receiver Account")
+             } else {
+               clearError();
+               if (formIsValid() && document.getElementById("signature").value.length !== 0){
+                 submit();
+                 document.getElementById('submit-button').classList.add("disabled");
+                 document.getElementById('reset-button').classList.add("disabled");
+               }
+             }
+           }
+         });
+
+      //Activate Menu
+      $('.ui.secondary.pointing.menu').on('click', ".item", function(e) {
+         $('.ui .item').removeClass('active');
+         $(this).addClass('active');
+         $(`.ui .segment .field`).attr("hidden", true)
+         $(`.ui .segment #${e.target.id}-input`).attr("hidden", false)
+       });
+
+       //Activate Dropdown
+       $('.dropdown')
+         .dropdown();
+
+       $('.message .close')
+         .on('click', function() {
+           $(this)
+             .closest('.message')
+             .transition('fade')
+           ;
+         })
+       ;
+     });
+
      const mkReq = (cmd) => {
          return {
              headers: {
@@ -18,162 +230,379 @@
          };
      };
 
-     const is_hexadecimal = (str) => {
-         const regexp = /^[0-9a-fA-F]+$/;
-         if (regexp.test(str)) return true;
-         else return false;
-     }
-
-     const convertDecimal = (decimal) => {
-       decimal = decimal.toString();
-       if (decimal.includes('.')) { return decimal }
-       if ((decimal / Math.floor(decimal)) === 1) {
-         decimal = decimal + ".0"
-       }
-       return decimal
-     }
-
-     const createTime = () =>  Math.round((new Date).getTime()/1000)-60;
-
-     const checkKey = (key) => {
-         if (key.length !== 64) {
-             throw "Key does not have length of 64";
-         } else if (!is_hexadecimal(key)){
-             throw "Key is not hex string";
-         }
-         return true;
-     }
-
-     const checkSecretKey = (key) => {
-         if (key.length !== 64 && key.length !== 128) {
-             throw "Key does not have the correct length";
-         } else if (!is_hexadecimal(key)){
-             throw "Key is not hex string";
-         }
-         return true;
-     }
-
-    const checkSignature = (sig) => {
-      if (sig.length !== 128) {
-        throw "Sig does not have the correct length";
-      }
-      return true;
-    }
-
-    function checkAccountName(accountName) {
-      if (accountName.length<3) {
-        throw "Account name is too short!";
-      }
-      if (accountName.length>256) {
-        throw "Account name is too long!";
-      }
-      return accountName;
-    }
-
-    const checkAccount = async (accountName, chainId, server, networkId) => {
-      var host = `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
-      try {
-        checkAccountName(accountName);
-      if (xchain()){
-        const acct = await getAccountDetails(accountName, host)
-        try {
-          if (acct.result.status==="success") {
-            setSigError(`"${accountName}" already exists on chain ${chainId}. Use transfer function instead.`)
-          } else return true;
-        } catch(e) {
-           setSigError(`"${accountName}" already exists on chain ${chainId}. Use transfer function instead.`)
-        }
-      } else {
-        return true;
-      }
-    } catch(e){
-      setSigError(e)
-    }
-    }
-
-    const checkToChainId = async (chainId) => {
-      var accountName = document.getElementById('to-account').value;
-      var server = document.getElementById("server").value
-      var networkId = document.getElementById("networkId").textContent
-      if (xchain()) checkAccount(accountName, chainId, server, networkId);
-      else if (document.getElementById('from-account').value === accountName &&
-               document.getElementById('from-chain-id').value === chainId){
-        setSigError("You cannot transfer to the same account")
-      } else {
-        try {
-         checkAccountName(accountName);
-       } catch(e){
-         setSigError(e)
-       }
-      }
-    }
-
-    const checkFromChainId = async (chainId) => {
-      var toChainId = document.getElementById('to-chain-id').value
-      var accountName = document.getElementById('to-account').value;
-      var server = document.getElementById("server").value
-      var networkId = document.getElementById("networkId").textContent
-      if (xchain()) checkAccount(accountName, toChainId, server, networkId)
-      else if (document.getElementById('from-account').value === accountName &&
-               chainId === toChainId){
-       setSigError("You cannot transfer to the same account")
-      }
-    }
-
-    const checkToAccount = async (accountName) => {
-      var chainId = document.getElementById('to-chain-id').value;
-      var server = document.getElementById("server").value
-      var networkId = document.getElementById("networkId").textContent
-      if (xchain()) checkAccount(accountName, chainId, server, networkId)
-      else if (document.getElementById('from-account').value === accountName &&
-               document.getElementById('from-chain-id').value === chainId){
-        setSigError("You cannot transfer to the same account")
-      } else {
-        try {
-         checkAccountName(accountName);
-       } catch(e){
-         setSigError(e)
-       }
-      }
-    }
-
-    function checkAmount(amount) {
-      if (isNaN(Number(amount))) {
-        throw "Amount is not a number!";
-      } else if (Number(amount) <= 0) {
-        throw "Amount must be positive!";
-      } else return Number(amount);
-    }
-
-    async function getVersion(server){
-      try {
-        const nodeInfo = await fetch(`https://${server}/info`);
-        const nodeInfoJSON = await nodeInfo.json();
-        return nodeInfoJSON.nodeVersion;
-      } catch(e){
-        throw(e)
-      }
-    }
-
-    function verifyNode(node){
-      resetSig();
-      getVersion(node)
-       .then(networkId => {
-          document.getElementById("networkId").classList.remove("red")
-          document.getElementById("networkId").textContent = networkId;
-        })
-       .catch(e => {
-         console.log(e)
-         document.getElementById("networkId").classList.add("red")
-         document.getElementById("networkId").textContent = "Not a Chainweb Node";
+     // INITIATION FUNCTIONS
+     window.addEventListener('load', function (event) {
+       document.getElementById("fromAccount").addEventListener("blur", async function(e){
+         fetchSenderKeyset();
        })
+
+       document.getElementById("network-0").addEventListener("click", async function(e){
+         reset();
+       })
+
+       document.getElementById("network-1").addEventListener("click", async function(e){
+         reset();
+       })
+
+       document.getElementById("fromChainId").addEventListener("change", async function(e){
+         fetchSenderKeyset();
+         showXWarning()
+       })
+
+       document.getElementById("toChainId").addEventListener("change", async function(e){
+         fetchReceiverKeyset();
+         showXWarning()
+       })
+
+       document.getElementById("toAccount").addEventListener("blur", async function(e){
+         fetchReceiverKeyset();
+       })
+
+       document.getElementById("sign-button").addEventListener("click",  function(event){
+         const {fromChainId, toChainId, fromAccount, toAccount} = getInputs();
+         if (formIsValid()){
+           if (document.getElementById("publicKey").value===""){
+              setError("Sender is not valid")
+           } else if (document.getElementById("sign-button").classList.contains('active')){
+             closeAccordion();
+           } else if (!isCrossChain(fromChainId, toChainId) && (fromAccount === toAccount)){
+             setError("Sender Account is the Receiver Account")
+           } else {
+             showHash();
+           }
+         }
+       })
+
+     document.getElementById("reset-button").addEventListener("click", function(event){
+       reset();
+     })
+
+     });
+
+     function formIsValid(){
+       return $('.form').form('is valid');
+     }
+
+     function reset(){
+       clearError()
+       $('.form').form('reset');
+       closeAccordion()
+       enableFields()
+       document.getElementById("receiver-keyset").hidden = true;
+       document.getElementById("receiver-exist").hidden = true;
+       document.getElementById("receiver-select").hidden = true;
+       document.getElementById("receiver-keyset-fixed").value = null;
+     }
+
+    function showXWarning(){
+      let bool;
+      let {fromChainId, toChainId} = getInputs();
+      bool = isCrossChain(fromChainId, toChainId);
+      if (bool){
+        document.getElementById('xchain-box').classList.remove("hidden")
+        document.getElementById("x-header").innerHTML = "You're about to make a Cross Chain Transfer.";
+        document.getElementById("x-message").innerHTML = "This process will take about 4 minutes, and may result in an unfinished transaction depending on network error or the state of gas station. Please keep the requestKey for further processing wait until the transaction finishes.";
+      }
+      else {
+        document.getElementById("xchain-box").classList.add("hidden");
+        document.getElementById("x-header").innerHTML = "";
+        document.getElementById("x-message").innerHTML = "";
+      }
+    }
+
+     function getNode(chainId) {
+       let apiHost = (node, networkId, chainId) => `https://${node}/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
+       if (document.getElementById("network").innerText === "Mainnet") {
+         return {
+           host : apiHost("us-e1.chainweb.com", "mainnet01", chainId),
+           networkId: "mainnet01"
+         }
+       } else if (document.getElementById("network").innerText === "Testnet") {
+         return {
+           host : apiHost("us1.testnet.chainweb.com", "testnet04", chainId),
+           networkId: "testnet04"
+         }
+       } else {
+         console.log(JSON.stringify(document.getElementById("network").innerText))
+       }
+     }
+
+     function getNetwork() {
+       if (document.getElementById("network").innerText === "Mainnet") {
+         return "mainnet";
+       } else if (document.getElementById("network").innerText === "Testnet") {
+         return "testnet";
+       } else {
+         console.log(JSON.stringify(document.getElementById("network").innerText))
+       }
+     }
+
+     async function submit() {
+       clearError();
+       let cmd = document.getElementById("cmd").value
+       let sig = document.getElementById("signature").value;
+
+       //Sign with signature
+       let apiHost = getNode(document.getElementById("fromChainId").value).host
+       let targetHost = getNode(document.getElementById("toChainId").value).host
+       let networkId=getNode(document.getElementById("toChainId").value).networkId
+       //Sign with Private Key
+       if (isPriv(sig)) {
+         cmd = getTransferCmd();
+         closeAccordion()
+       }
+       //Sign with Signature
+       else if (!isPriv(sig)) cmd = signCmd(cmd, sig);
+       const txRes = await fetch(`${apiHost}/api/v1/send`, mkReq(cmd))
+
+       document.getElementById('status-box').classList.remove("hidden")
+       //Fetch succeeded
+       if (txRes.ok) {
+           let res = await txRes.json();
+           document.getElementById('status-lookup').hidden = true;
+           document.getElementById('status-header').innerHTML = "Waiting for response...";
+           document.getElementById('status-message').innerText = JSON.stringify(res.requestKeys[0]);
+           fetch(`${apiHost}/api/v1/listen`, mkReq({"listen": res.requestKeys[0]}))
+           .then(res =>{
+             return res.json()
+           })
+           .then(async res => {
+             if (res.result.status==="failure"){
+               document.getElementById('status-header').innerHTML = "Transfer Failed";
+               document.getElementById('status-message').innerText = JSON.stringify(res.result.error);
+               document.getElementById('status-lookup').hidden = false;
+               document.getElementById('status-link').innerText = res.reqKey;
+               document.getElementById('status-link').href = getLink(res.reqKey);
+             } else {
+               //Check if crosschain
+               if (res.continuation){
+                 //send proof
+
+                 const pactId = res.continuation.pactId;
+                 document.getElementById('status-message').innerHTML ="Initiated from the Source Chain: " + "<br />" +  JSON.stringify(pactId) + "<br />" + "<br />" + "Waiting for Proof...";
+                 const targetChainId = res.continuation.yield.provenance.targetChainId;
+                 const spvCmd = {"targetChainId": targetChainId, "requestKey": pactId };
+                 let proof;
+                 while (!proof){
+                   const res =  await fetch(`${apiHost}/spv`, mkReq(spvCmd));
+                   let foo = await res;
+                   if (foo.ok){
+                     proof = await res.json();
+                   }
+                 }
+                 const m = Pact.lang.mkMeta("free-x-chain-gas", targetChainId, 0.000000000001, 300, createTime(), 28800);
+                 const contCmd = {type: "cont", keyPairs:[],pactId: pactId, rollback: false, step: 1, meta: m, proof: proof, networkId: networkId}
+                 const cmd = Pact.simple.cont.createCommand( contCmd.keyPairs, contCmd.nonce, contCmd.step, contCmd.pactId,
+                                                          contCmd.rollback, contCmd.envData, contCmd.meta, contCmd.proof, contCmd.networkId);
+                 fetch(`${targetHost}/api/v1/send`, mkReq(cmd))
+                 .then(async txRes => {
+                   if (txRes.ok) {
+                     let res = await txRes.json();
+                     document.getElementById('status-lookup').hidden = true;
+                     document.getElementById('status-header').innerHTML = "Waiting for response...";
+                     document.getElementById('status-message').innerHTML ="Initiated from the Source Chain: " + "<br />" +  JSON.stringify(pactId) + "<br />" + "<br />" + "Receiving from the Target Chain: " + "<br />" + JSON.stringify(res.requestKeys[0]);
+                     fetch(`${targetHost}/api/v1/listen`, mkReq({"listen": res.requestKeys[0]}))
+                     .then(res =>{
+                       return res.json();
+                     })
+                     .then(async res => {
+                       if (res.result.status==="failure"){
+                         document.getElementById('status-header').innerHTML = "Transfer Failed";
+                         document.getElementById('status-message').innerText = JSON.stringify(res.result.error);
+                         document.getElementById('status-lookup').hidden = false;
+                         document.getElementById('status-link').innerText = res.reqKey;
+                         document.getElementById('status-link').href = getLink(res.reqKey);
+                       } else {
+                         document.getElementById('status-header').innerHTML = "Transfer Succeeded";
+                         document.getElementById('status-message').innerText = JSON.stringify(res.result.data);
+                         document.getElementById('status-lookup').hidden = false;
+                         document.getElementById('status-link').innerText = res.reqKey;
+                         document.getElementById('status-link').href = getLink(res.reqKey);
+                       }
+                     })
+                   } else {
+                   let res = await txRes.text();
+                   document.getElementById('status-header').innerHTML = "Request Failed.";
+                   document.getElementById('status-message').innerText = res;
+                   document.getElementById('status-lookup').hidden = true;
+                 }})
+               } else {
+                 document.getElementById('status-header').innerHTML = "Transfer Succeeded."
+                 document.getElementById('status-message').innerText = JSON.stringify(res.result.data);
+                 document.getElementById('status-lookup').hidden = false;
+                 document.getElementById('status-link').innerText = res.reqKey;
+                 document.getElementById('status-link').href = getLink(res.reqKey);
+               }
+             }
+           })
+         } else {
+           let res = await txRes.text();
+           document.getElementById('status-header').innerHTML = "Request Failed";
+           document.getElementById('status-message').innerText = res;
+           document.getElementById('status-lookup').hidden = true;
+         }
+         return (false);
+     };
+
+     let getLink = (reqKey) => `https://explorer.chainweb.com/${getNetwork()}/tx/${reqKey}`;
+
+     async function fetchSenderKeyset(){
+       const chainId = document.getElementById("fromChainId").value;
+       const account = document.getElementById("fromAccount").value;
+       checkPublicKey(account, chainId).then(res => {
+         if (!res) {}
+         else if (res.result.status==="failure" && res.result.error.message.slice(0,24)==="with-read: row not found") {
+           document.getElementById("publicKey").value = ""
+           setError("Sender does not exist")
+         } else {
+           if (res.result.data.guard.keysetref) {
+             getKeysetRef(res.result.data.guard.keysetref, getNode(chainId).host).then(resKeyset => {
+               let publicKey = resKeyset.result.data.keys
+               document.getElementById("publicKey").value = publicKey
+               clearError();
+             });
+           } else if (res.result.data.guard.keys){
+             let publicKey = res.result.data.guard.keys
+             document.getElementById("publicKey").value = publicKey
+             clearError();
+           } else {
+             setError("Account Guard of the sender is not conventional. Please use a different tool.")
+           }
+         }
+       })
+     }
+
+     async function fetchReceiverKeyset(){
+       const chainId = document.getElementById("toChainId").value;
+       const account = document.getElementById("toAccount").value;
+       checkPublicKey(account, chainId).then(res => {
+         if (!res) {}
+         else if (res.result.status==="failure" && res.result.error.message.slice(0,24)==="with-read: row not found") {
+           document.getElementById("receiver-keyset").hidden = false;
+           document.getElementById("receiver-exist").hidden = true;
+           document.getElementById("receiver-select").hidden = false;
+           document.getElementById("receiver-keyset-fixed").value = null;
+        } else {
+           document.getElementById("receiver-keyset").hidden = false;
+           document.getElementById("receiver-select").hidden = true;
+           document.getElementById("receiver-exist").hidden = false;
+           document.getElementById("receiver-keyset-fixed").value = JSON.stringify(res.result.data.guard, undefined, 2);
+         }
+       })
+     }
+
+   const convertDecimal = (decimal) => {
+     decimal = decimal.toString();
+     if (decimal.includes('.')) { return decimal }
+     if ((decimal / Math.floor(decimal)) === 1) {
+       decimal = decimal + ".0"
+     }
+     return decimal
    }
 
-    async function getAccountDetails(account, node){
+   const createTime = () =>  Math.round((new Date).getTime()/1000)-60;
+
+   function setError(msg) {
+     document.getElementById("kadena-form").classList.add("error")
+     document.getElementById("acct-err").hidden=false;
+     document.getElementById("acct-err").innerText = msg;
+   }
+
+   function clearError (){
+     document.getElementById("kadena-form").classList.remove("error")
+     document.getElementById("acct-err").hidden=true;
+     document.getElementById("acct-err").innerText = "";
+   }
+
+   var decodeBase64 = function(s) {
+     validateBase64(s);
+     var i, d = atob(s), b = new Uint8Array(d.length);
+     for (i = 0; i < d.length; i++) b[i] = d.charCodeAt(i);
+     return b;
+   };
+
+   function decode(s) {
+     return  s.replace(/-/g, '+')
+                 .replace(/_/g, '/')+"=";
+   }
+   function validateBase64(s) {
+     if (!(/^(?:[A-Za-z0-9+\/]{2}[A-Za-z0-9+\/]{2})*(?:[A-Za-z0-9+\/]{2}==|[A-Za-z0-9+\/]{3}=)?$/.test(s))) {
+       throw new TypeError('invalid encoding');
+     }
+   }
+
+   function isPriv(sig){
+     if (sig.length === 64) return true;
+     let secretKey = sig.slice(0,64);
+     let publicKey = sig.slice(64);
+     let restored = Pact.crypto.restoreKeyPairFromSecretKey(secretKey);
+     if (restored.secretKey === secretKey && restored.publicKey === publicKey) return true;
+     else return false
+   }
+
+   function validatePriv(priv){
+      try {
+        if (!Pact.crypto.restoreKeyPairFromSecretKey(priv)) {
+          return false;
+        } else {
+          let cmd = getTransferCmd();
+          let hash = decode(cmd.cmds[0].hash);
+          let sig = cmd.cmds[0].sigs[0].sig;
+          let pubKey = document.getElementById("publicKey").value;
+          try {
+            let verified = pubKey.filter(key => {
+              return nacl.sign.detached.verify(decodeBase64(hash),Pact.crypto.hexToBin(sig), Pact.crypto.hexToBin(key));
+            })
+            if (verified.length>0){
+              return true;
+            } else return false;
+          } catch {
+           return false
+          }
+        }
+       } catch {
+         return false
+       }
+   }
+
+   function validateSig (sig) {
+     let hash = document.getElementById("hash-string").innerText;
+     hash = decode(hash)
+     let pubKey = document.getElementById("publicKey").value;
+     try{
+       let verified = pubKey.filter(key => {
+         return nacl.sign.detached.verify(decodeBase64(hash),Pact.crypto.hexToBin(sig), Pact.crypto.hexToBin(key));
+       })
+      if (verified.length>0){
+        return true;
+      } else return false;
+    } catch(e){
+      return false;
+    }
+   }
+
+   async function getAccountDetails(account, node){
+     if (account.length>=3){
+       try {
+         const m = Pact.lang.mkMeta("", "", 0.00001, 600, createTime(), 28800);
+         const tx = await Pact.fetch.local({
+           pactCode: `(coin.details ${JSON.stringify(account)})`,
+           meta: m
+         }, node)
+         return tx;
+       } catch(e){
+         throw(e)
+       }
+     } else{
+       return false;
+     }
+   }
+
+    async function getKeysetRef(keyset, node){
       try {
         const m = Pact.lang.mkMeta("", "", 0.00001, 600, createTime(), 28800);
         const tx = await Pact.fetch.local({
-          pactCode: `(coin.details ${JSON.stringify(account)})`,
+          pactCode: `(describe-keyset ${JSON.stringify(keyset)})`,
           meta: m
         }, node)
         return tx;
@@ -182,780 +611,376 @@
       }
     }
 
-    //TRANSFER FUNCTIONS
-    const sendNonJson = async function(sendCmd, apiHost){
-      var c;
-       if (!apiHost) throw new Error(`Pact.fetch.send(): No apiHost provided`);
-       if (sigOption() === "signature")  {
-         const cmd = document.getElementById("raw-command").value
-         c = JSON.parse(cmd.replace("REPLACE THIS WITH SIGNATURE", sendCmd.signature))
-       }
-       else {
-         c = Pact.simple.exec.createCommand( sendCmd.keyPairs, sendCmd.nonce, sendCmd.pactCode,
-                                             sendCmd.envData, sendCmd.meta, sendCmd.networkId);
-       }
-       const txRes = await fetch(`${apiHost}/api/v1/send`, mkReq(c));
-       return txRes;
-    };
-
-
-   async function initiateXchain(fromAccount, toAccount, toPubKey, pred, amount, fromPub, fromPriv, server, chainId, targetChainId, signature){
-     disableSubmit();
-     m = Pact.lang.mkMeta(fromAccount, chainId, 0.00001, 600, createTime(), 28800);
-     const networkId = document.getElementById("networkId").textContent;
-     sendObj = {
-         pactCode: `(coin.transfer-crosschain ${JSON.stringify(fromAccount)} ${JSON.stringify(toAccount)} (read-keyset "ks") ${JSON.stringify(targetChainId)} ${convertDecimal(amount)})`,
-         keyPairs: {publicKey: fromPub, secretKey: fromPriv},
-         meta: m,
-         networkId: networkId,
-         envData: {"ks": {"pred": pred, "keys": [toPubKey]}},
-         signature: signature
-     };
-     host = `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
-     handleResult = async function(res) {
-         foo = await res;
-         hideSpinner();
-         if ( foo.ok ) {
-             showStatusBox();
-             j = await res.json();
-             var reqKey = j.requestKeys[0];
-             document.getElementById('status-message').textContent = "Transaction Pending..."
-             document.getElementById('request-key').textContent = "Request Key: " + reqKey;
-             showSpinner();
-             //do a listen
-             Pact.fetch.listen({ listen: reqKey }, `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`)
-                 .then(res => {
-                     if (res.result.status === "success") {
-                       if (res.continuation) {
-                         document.getElementById('status-message').textContent = "CROSS CHAIN TRANSFER INITIATED"
-                         document.getElementById('xchain-div').hidden = false;
-                         localStorage.setItem("xchain-server",server);
-                         localStorage.setItem("xchain-requestKey", reqKey);
-                       } else {
-                         document.getElementById('status-message').textContent = "TRANSFER SUCCEEDED"
-                       }
-                     } else {
-                       document.getElementById('status-message').textContent = "TRANSFER FAILED with error: " + res.result.error.message
-                     }
-                 })
-         } else {
-             showNegativeStatusBox();
-             t = await res.text();
-             document.getElementById('status-message').textContent = t;
-         }
-     }
-     sendNonJson(sendObj, host).
-       then(handleResult).catch((e) => {
-           hideSpinner();
-           showNegativeStatusBox();
-           console.log('Caught error');
-           console.log(e);
-           document.getElementById('status-message').textContent = "WRONG INPUTS";
-       })
+   async function checkPublicKey (account, chainId) {
+     let node = getNode(chainId).host;
+     return getAccountDetails(account, node);
    }
 
-  async function transferCreate(fromAccount, toAccount, toPubKey, pred, amount, fromPub, fromPriv, server, chainId, signature){
-      //diable button to avoid multiple presses
-      disableSubmit();
-      m = Pact.lang.mkMeta(fromAccount, chainId, 0.00001, 600, createTime(), 28800);
-      const networkId = document.getElementById("networkId").textContent;
-      sendObj = {
-          pactCode: `(coin.transfer-create ${JSON.stringify(fromAccount)} ${JSON.stringify(toAccount)} (read-keyset "ks") ${convertDecimal(amount)})`,
-          keyPairs: [{publicKey: fromPub, secretKey: fromPriv, clist: [{name: "coin.GAS", args: []}, {name: "coin.TRANSFER", args: [fromAccount, toAccount, parseFloat(amount)]}]}],
-          meta: m,
-          networkId: networkId,
-          envData: {"ks": {"pred": pred, "keys": [toPubKey]}},
-          signature: signature
-      }
-
-       host = `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
-       handleResult = async function(res) {
-           foo = await res;
-           hideSpinner();
-           if ( foo.ok ) {
-               showStatusBox();
-               j = await res.json();
-               var reqKey = j.requestKeys[0];
-               document.getElementById('status-message').textContent = "Transaction Pending..."
-               document.getElementById('request-key').textContent = "Request Key: " + reqKey;
-               showSpinner();
-               //do a listen
-               Pact.fetch.listen({ listen: reqKey }, `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`)
-                   .then(res => {
-                       if (res.result.status === "success") {
-                           document.getElementById('status-message').textContent = "TRANSFER SUCCEEDED"
-                       } else {
-                           document.getElementById('status-message').textContent = "TRANSFER FAILED with error: " + res.result.error.message
-                       }
-                   })
-           } else {
-               showNegativeStatusBox();
-               t = await res.text();
-               document.getElementById('status-message').textContent = t;
-           }
-
-       }
-       sendNonJson(sendObj, host).
-         then(handleResult).catch((e) => {
-             hideSpinner();
-             showNegativeStatusBox();
-             console.log('Caught error');
-             console.log(e);
-             document.getElementById('status-message').textContent = "WRONG INPUTS";
-         })
-   }
-
-
-     var selectSig = function() {
-       document.getElementById("signature-input").hidden=false;
-       // const inputDiv = document.getElementById("signature-input")
-       document.getElementById("from-pub-key").value = ""
-       document.getElementById("from-priv-key").value = ""
-       document.getElementById("from-signature").value = ""
-       setSubmitStatus();
-       document.getElementById("pub-input").hidden=false;
-       if (sigOption()==="signature"){
-         document.getElementById("priv-input").hidden=true;
-       } else if (sigOption()==="privKey"){
-         document.getElementById("sig-input").hidden=true;
-         document.getElementById("priv-input").hidden=false;
-       }
-     }
-
-     var sigOption = function (){
-       if (document.getElementById("sig-option").checked) {
-         return "signature"
-       } else if (document.getElementById("priv-option").checked){
-         return "privKey"
-       } else return false;
-     }
-
-     var getCommand = function(){
-       const chainId = document.getElementById('from-chain-id').value;
-       const fromAccount = document.getElementById('from-account').value;
-       const toAccount = document.getElementById('to-account').value;
-       const m = Pact.lang.mkMeta(fromAccount, chainId, 0.00001, 600, createTime(), 28800);
-       const amount = document.getElementById('amount').value;
-       const networkId = document.getElementById("networkId").textContent;
-       const fromPub = document.getElementById('from-pub-key').value;
-       const toPubKey = document.getElementById('to-pub-key').value;
-       const targetChainId = document.getElementById('to-chain-id').value;
-       var p = document.getElementById('predicate');
-       var pred = p.options[p.selectedIndex].value
-       var sendCmd;
-       if (xchain()){
-         sendCmd = {
-            pactCode: `(coin.transfer-crosschain ${JSON.stringify(fromAccount)} ${JSON.stringify(toAccount)} (read-keyset "ks") ${JSON.stringify(targetChainId)} ${convertDecimal(amount)})`,
-            keyPairs: [{publicKey: fromPub, secretKey: null}],
-            meta: m,
-            envData: {"ks": {"pred": pred, "keys": [toPubKey]}},
-            networkId: networkId
-        };
-       } else {
-        sendCmd = {
-            pactCode: `(coin.transfer-create ${JSON.stringify(fromAccount)} ${JSON.stringify(toAccount)} (read-keyset "ks") ${convertDecimal(amount)})`,
-            keyPairs: [{publicKey: fromPub, secretKey: null, clist: [{name: "coin.GAS", args: []}, {name: "coin.TRANSFER", args: [fromAccount, toAccount, parseFloat(amount)]}]}],
-            meta: m,
-            envData: {"ks": {"pred": pred, "keys": [toPubKey]}},
-            networkId: networkId,
-        };
-       }
-       var cmd = Pact.simple.exec.createCommand( sendCmd.keyPairs, sendCmd.nonce, sendCmd.pactCode,
-                                           sendCmd.envData, sendCmd.meta, sendCmd.networkId)
-       console.log(cmd)
-       var c = JSON.stringify(cmd)
-       var hash = cmd.cmds[0].hash
-      if (fromPub){
-         document.getElementById("raw-command").value = c;
-         document.getElementById("raw-command").textContent = hash;
-         document.getElementById("sig-input").hidden=false;
-       }
-     }
-
-    //UI FUNCTIONS
-    function disableSubmit() {
-      document.getElementById('submit-button').disabled = true;
-    }
-
-    function enableSubmit() {
-      document.getElementById('submit-button').disabled = false;
-    }
-
-     $(function() {
-         $('.ui.dropdown').dropdown();
-     });
-
-     function clearStatusBox() {
-        document.getElementById('status-box').setAttribute("class", "ui compact message result hidden");
-        document.getElementById('status-message').textContent = ""
-        document.getElementById('request-key').textContent = ""
-     }
-
-     function showNegativeStatusBox() {
-         document.getElementById('status-box').setAttribute("class", "ui compact negative message result");
-     }
-
-     function showStatusBox() {
-         document.getElementById('status-box').setAttribute("class", "ui compact message result");
-     }
-
-     function showSpinner() {
-         //document.getElementById('pending-spinner').setAttribute("class", "ui dimmer active");
-     }
-
-     function hideSpinner() {
-         //document.getElementById('pending-spinner').setAttribute("class", "ui dimmer");
-     }
-
-     function clearError() {
-         document.getElementById("acct-err").innerText = "";
-         document.getElementById("kadena-form").setAttribute("class", "ui form");
-     }
-
-     function setError(msg) {
-       disableSubmit();
-       document.getElementById("acct-err").innerText = msg;
-       document.getElementById("kadena-form").setAttribute("class", "ui form error");
-     }
-
-     function setSigError(msg) {
-       resetSig();
-       document.getElementById("acct-err").innerText = msg;
-       document.getElementById("kadena-form").setAttribute("class", "ui form error");
-       throw msg
-     }
-
-
-     function hasValue(elId) {
-         v = document.getElementById(elId).value;
-         return v && v.length > 0;
-     }
-
-     //Determine how complete is the form
-      function setStatus(){
-        //Forms are filled out until sig, and will need verification before sigs are allowed
-        if (complete()){
-          //Check if forms are filled out and are verified,
-          // and enable / disable sigs depending on result
-          setSigStatus();
-          //If sigs are enabled and complete
-          if (allComplete()){
-            //Determine if sigs are verified and setstatus
-            setSubmitStatus();
-          } else disableSubmit();
-        } else{
-        //IF forms are not filled out, reset sigs
-          resetSig()//this also disables submit
-        }
-      }
-
-      async function sigComplete(){
-        try {
-          let check1 = await  checkToAccount(document.getElementById('to-account').value)
-          let check2 = await checkToChainId(document.getElementById('to-chain-id').value)
-          let check3 = await checkFromChainId(document.getElementById('to-chain-id').value)
-          if ( checkAccountName(document.getElementById('from-account').value) &&
-               checkAccountName(document.getElementById('to-account').value) &&
-               checkKey(document.getElementById("to-pub-key").value) &&
-               checkAmount(document.getElementById('amount').value) &&
-               check1 && check2 && check3
-             ) {
-               return true;
-          } else {
-            return false;
-          }
-        } catch(e){
-          resetSig();
-        }
-
-      }
-
-      function allComplete(){
-        if (
-          hasValue('from-pub-key') &&
-          (hasValue('from-priv-key') || hasValue("from-signature"))){
-            return true
-          }
-          else return false;
-      }
-
-      function setSigStatus() {
-        if (sigComplete()) enableSig();
-        else resetSig();
-      }
-
-    function submitComplete(){
-      if (hasValue('from-priv-key')) {
-        if (checkKey(document.getElementById('from-pub-key').value)) return true;
-      } else if (hasValue("from-signature")){
-        if (checkKey(document.getElementById('from-pub-key').value)) return true;
-      } else{
-        return false
-      }
-    }
-
-    function setSubmitStatus() {
-        if (submitComplete()) {
-           enableSubmit();
-      } else {
-          disableSubmit();
-      }
-    }
-
-    function complete(){
-      if ( hasValue('from-account') &&
-           hasValue('to-account') &&
-           hasValue('to-pub-key') &&
-           hasValue('amount') &&
-           hasValue('server') &&
-           hasValue('from-chain-id') &&
-           hasValue('to-chain-id') ) {
-        return true;
-      } else {
-        return false;
-      }
-    }
-
-    function resetSig(){
-      clearStatusBox();
-      disableSig();
-      disableSubmit();
-    }
-
-
-     function enableSig(){
-      document.getElementById("sig-option").disabled = false;
-      document.getElementById("priv-option").disabled = false;
-      document.getElementById("signature-input").hidden=false;
-     }
-
-     function disableSig(){
-      document.getElementById("raw-command").value = "";
-      document.getElementById("raw-command").textContent = "";
-      document.getElementById("sig-option").checked=false;
-      document.getElementById("sig-option").disabled = true;
-      document.getElementById("priv-option").checked=false;
-      document.getElementById("priv-option").disabled = true;
-      document.getElementById("from-pub-key").value =""
-      document.getElementById("from-priv-key").value =""
-      document.getElementById("from-signature").value =""
-      document.getElementById("signature-input").hidden=true;
-      document.getElementById("sig-input").hidden=true;
-      document.getElementById("pub-input").hidden=true;
-      document.getElementById("priv-input").hidden=true;
-      document.getElementById("sig-input").hidden=true;
-     }
-
-   function validate(elemId, eventName, checkInput) {
-     document.getElementById(elemId).addEventListener(eventName, function(event) {
+   function validateKeyset (keyset){
      try {
-         enableSubmit();
-         clearError();
-         val = event.srcElement.value;
-         if ( val !== null && val !== "" ) {
-           checkInput(val);
-         }
-         setStatus();
+       const {pred, keys} = keyset;
+       let preds = [
+         "keys-all",
+         "keys-any",
+         "keys-2"
+       ]
+       let validKeys = keys.filter(keys=> keys.length===64).length === keys.length;
+       let validPred = preds.includes(pred);
+       return validKeys && validPred;
+     } catch {
+       return false;
      }
-     catch(err) {
-       console.log(err)
-       setError(err);
-       setStatus();
-     }}, false);
    }
 
-    function xchain(){
-      let to = document.getElementById("to-chain-id").value;
-      let from = document.getElementById("from-chain-id").value;
-      console.log('to', to, "from", from);
-      if (to === "" || from === "") return false;
-      if (to !== from){
-        return true;
-      } else return false;
+  function crossTransfer(sender, receiver, receiverKp, srcChain, targetChain, amount, fromPub, fromPriv){
+    const m = Pact.lang.mkMeta(sender, srcChain, 0.00001, 600, createTime(), 28800);
+    const kp = fromPub.map(pub => {
+      return {publicKey: pub, secretKey: fromPriv}
+    })
+    let pactCode = `(coin.transfer-crosschain ${JSON.stringify(sender)} ${JSON.stringify(receiver)} (read-keyset "ks") ${JSON.stringify(targetChain)} ${convertDecimal(amount)})`;
+    if (!validateKeyset(receiverKp) && receiverKp.keysetref){
+      pactCode = `(coin.transfer-crosschain ${JSON.stringify(sender)} ${JSON.stringify(receiver)} (keyset-ref-guard ${JSON.stringify(receiverKp.keysetref)}) ${JSON.stringify(targetChain)} ${convertDecimal(amount)})`;
     }
 
-     // INITIATION FUNCTIONS
-     window.addEventListener('load', function (event) {
-        document.getElementById("server").value = "us-e1.chainweb.com";
-        document.getElementById("networkId").textContent = "mainnet01";
-        validate("server", "input", verifyNode);
-        validate("from-account", "input", checkAccountName);
-        validate("to-account", "input", checkToAccount);
-        validate("to-pub-key", "input", checkKey);
-        validate("amount", "input", checkAmount);
-        validate("from-pub-key","input",  checkKey);
-        validate("from-priv-key", "input", checkSecretKey);
-        validate("from-signature","input", checkSignature);
-        validate("to-chain-id", "change", checkToChainId);
-        validate("from-chain-id", "change", checkFromChainId);
+    return Pact.simple.exec.createCommand(
+      kp,
+      JSON.stringify(new Date()),
+      pactCode,
+      {"ks": receiverKp},
+      m,
+      getNode(srcChain).networkId
+    )
+  }
 
-       document.getElementById("sig-option").addEventListener("input", function(event) {
-         selectSig();
-       });
+  function transferCreate(sender, receiver, receiverKp, fromPub, fromPriv, chainId, amount){
+    const m = Pact.lang.mkMeta(sender, chainId, 0.00001, 600, createTime(), 28800);
+    const kp = fromPub.map(pub => {
+      return {publicKey: pub, secretKey: fromPriv, clist: [{name: "coin.GAS", args: []}, {name: "coin.TRANSFER", args: [sender, receiver, Number(amount)]}]}
+    })
+    let pactCode = `(coin.transfer-create ${JSON.stringify(sender)} ${JSON.stringify(receiver)} (read-keyset "ks") ${convertDecimal(amount)})`;
+    if (!validateKeyset(receiverKp) && receiverKp.keysetref){
+      pactCode = `(coin.transfer-create ${JSON.stringify(sender)} ${JSON.stringify(receiver)} (keyset-ref-guard ${JSON.stringify(receiverKp.keysetref)}) ${convertDecimal(amount)})`;
+    }
+    return Pact.simple.exec.createCommand(
+        kp,
+        JSON.stringify(new Date()),
+        pactCode,
+        {"ks": receiverKp},
+        m,
+        getNode(chainId).networkId
+      )
+  }
 
-       document.getElementById("priv-option").addEventListener("input", function(event) {
-         selectSig();
-       });
+  const signCmd = function(unSigned, sig){
+    let signed = Object.assign(unSigned);
+    signed.cmds[0].sigs = [{"sig": sig}]
+    return signed;
+  }
 
-       document.getElementById("from-pub-key").addEventListener("input", function(event){
-         if (sigOption() === "signature") getCommand();
-       })
+  const getInputs = function (){
+    return {
+      fromAccount: document.getElementById("fromAccount").value,
+      fromChainId: document.getElementById("fromChainId").value,
+      fromPublicKey: document.getElementById("publicKey").value,
+      toAccount: document.getElementById("toAccount").value,
+      toChainId: document.getElementById("toChainId").value,
+      toGuard: readKeyset(),
+      amount: document.getElementById("amount").value,
+      signature: document.getElementById("signature").value
+    }
+  }
 
-       }, false);
+  const getTransferCmd = function () {
+    let {fromAccount, fromChainId, fromPublicKey, toAccount, toChainId, toGuard, amount, signature} = getInputs();
+    let privKey = signature.length === 128 && isPriv(signature)
+      ? signature.slice(0,64)
+      : signature.length === 64
+        ? signature
+        : null
+    if (isCrossChain(fromChainId, toChainId)) {
+      return crossTransfer(fromAccount, toAccount, toGuard, fromChainId, toChainId, amount, fromPublicKey, privKey);
+    }
+    else return transferCreate(fromAccount, toAccount, toGuard, fromPublicKey, privKey, fromChainId, amount)
+  }
 
-     document.addEventListener('click', async function (event) {
-         if (!event.target.matches('#submit-button')) return;
-         event.preventDefault();
-         var e = document.getElementById('from-chain-id');
-         var p = document.getElementById('predicate');
-         var rawPriv = document.getElementById('from-priv-key').value;
-         var priv = rawPriv
-          ? rawPriv.length===128
-            ? rawPriv.slice(0, 64)
-            : document.getElementById('from-priv-key').value
-          : null;
-        if (xchain()){
-          initiateXchain(
-              document.getElementById('from-account').value,
-              document.getElementById('to-account').value,
-              document.getElementById('to-pub-key').value,
-              p.options[p.selectedIndex].value,
-              document.getElementById('amount').value,
-              document.getElementById('from-pub-key').value,
-              priv,
-              document.getElementById('server').value,
-              document.getElementById('from-chain-id').value,
-              document.getElementById('to-chain-id').value,
-              document.getElementById('from-signature').value
-            )
-        } else {
-          transferCreate(
-              document.getElementById('from-account').value,
-              document.getElementById('to-account').value,
-              document.getElementById('to-pub-key').value,
-              p.options[p.selectedIndex].value,
-              document.getElementById('amount').value,
-              document.getElementById('from-pub-key').value,
-              priv,
-              document.getElementById('server').value,
-              document.getElementById('from-chain-id').value,
-              document.getElementById('from-signature').value
-          )
-        }
-
-     }, false);
-
-     //FILE UPLOAD FUNCTIONS
-     function loadFileAsText(){
-        fileReader.onload = function(fileLoadedEvent){
-            var textFromFileLoaded = fileLoadedEvent.target.result;
-            // document.getElementById("inputTextToSave").value = textFromFileLoaded;
-        };
-      }
-
-      function toPubLoad(){
-        var prevMsg = document.getElementById("acct-err").innerText;
-        console.log(prevMsg.replace(/\s/g, '').length)
-        var errMsg = "Wrong format. Please upload a .kda public file"
-        try {
-          var fileToLoad = document.getElementById("to-pub-file").files[0];
-          if (fileToLoad.name.substr(fileToLoad.name.length - 4) !== ".kda" || fileToLoad.name.includes("private")) {
-            throw errMsg
-          }
-          var pubKey;
-          var fileReader = new FileReader();
-          fileReader.onload = function(fileLoadedEvent){
-              var textFromFileLoaded = fileLoadedEvent.target.result;
-              pubKey = textFromFileLoaded.replace("public: ", "");
-              if (pubKey.length !== 64) {
-                setError(errMsg);
-              } else {
-                document.getElementById("to-pub-key").value = pubKey;
-                setStatus();
-              }
-          };
-          fileReader.readAsText(fileToLoad, "UTF-8");
-          if (prevMsg.replace(/\s/g, '').length !== 0 ) {
-            setError(errMsg);
-          } if (prevMsg === errMsg) {
-            clearError()
-          }
-        } catch (err) {
-          document.getElementById("to-pub-key").value = ""
-          if (prevMsg.replace(/\s/g, '').length !== 0) {
-            setError(errMsg);
-          } else {
-            console.log(err)
-            setError("Please Select a File");
-          }
+  const readKeyset = function(){
+    if (document.getElementById("receiver-keyset-fixed").value) {
+      return JSON.parse(document.getElementById("receiver-keyset-fixed").value);
+    } else if(document.getElementById("basic").classList.contains( 'active' )){
+          if (document.getElementById("basicPublicKey").value.length !== 64) return null
+      else {
+        return {
+           "keys": [document.getElementById("basicPublicKey").value],
+           "pred": document.getElementById("basicPredicate").value
         }
       }
+    } else if (document.getElementById("custom").classList.contains( 'active' )){
+      return JSON.parse(document.getElementById("custom-guard").value)
+    } else if (document.getElementById("upload").classList.contains( 'active' )){
+      return document.getElementById("toPubFile").value
+    } else return null;
+  }
 
-     function PrivLoad(){
-       var prevMsg = document.getElementById("acct-err").innerText;
-       console.log(prevMsg.replace(/\s/g, '').length)
-       var errMsg = "Wrong format. Please upload a .kda private file"
-       try {
-         var fileToLoad = document.getElementById("priv-file").files[0];
-         if (fileToLoad.name.substr(fileToLoad.name.length - 4) !== ".kda" || fileToLoad.name.includes("public")) {
-           throw errMsg
-         }
-         var fileReader = new FileReader();
-         fileReader.onload = function(fileLoadedEvent){
-             var textFromFileLoaded = fileLoadedEvent.target.result;
-             var keys = textFromFileLoaded.split("\n");
-             document.getElementById("from-pub-key").value = keys[0].replace("public: ", "");
-             document.getElementById("from-priv-key").value = keys[1].replace("secret: ", "");
-             setStatus();
-         };
-         fileReader.readAsText(fileToLoad, "UTF-8");
-         if (prevMsg.replace(/\s/g, '').length !== 0 ) {
-           setError(prevMsg.replace(`${errMsg} and `, "").replace(`${errMsg} and `, "").replace(`${errMsg} and `, ""));
-         } if (prevMsg === errMsg) {
-           clearError()
-         }
-       } catch (err) {
-         document.getElementById("from-pub-key").value = ""
-         document.getElementById("from-priv-key").value = ""
-         if (prevMsg.replace(/\s/g, '').length !== 0) {
-           setError(`${err} and ${prevMsg}`);
-         } else {
-           setError("Please Select a File");
-           console.log(err);
-         }
-       }
-     }
+  const openAccordion  = function (){
+    let title = document.getElementById("sign-button");
+    let content = document.getElementById("hash-content");
+    title.classList.add('active')
+    content.classList.add('active')
+  }
 
-    </script>
+  const disable = function (field){
+    document.getElementById(field).disabled = true;
+  }
+
+  const enable = function (field){
+    document.getElementById(field).disabled = false;
+  }
+
+  const disableFields = function(){
+    let fields = ['fromAccount','toAccount', 'receiver-select', 'amount',
+    ,'basicPublicKey','custom-guard']
+    fields.forEach(field => disable(field))
+    let dropdowns = ["predicateDropdown", "fromIdDropdown", "toIdDropdown"]
+    dropdowns.forEach(dropdown => {
+      document.getElementById(dropdown).classList.add('disabled')
+    })
+  }
+
+  const enableFields = function (field){
+    let fields = ['fromAccount','fromChainId','toAccount','toChainId', 'receiver-select', 'amount'
+    ,'basicPublicKey','basicPredicate','custom-guard']
+    fields.forEach(field => enable(field))
+    let dropdowns = ["predicateDropdown", "fromIdDropdown", "toIdDropdown"]
+    dropdowns.forEach(dropdown => {
+      document.getElementById(dropdown).classList.remove('disabled')
+    })
+  }
+
+  const closeAccordion  = function (){
+    let title = document.getElementById("sign-button");
+    let content = document.getElementById("hash-content");
+    title.classList.remove('active')
+    content.classList.remove('active')
+    document.getElementById("hash-string").innerText = "";
+    document.getElementById("cmd").value = null;
+  }
+
+  const getHash = function(){
+    document.getElementById("signature").value = ""
+    let title = document.getElementById("sign-button");
+    cmd = getTransferCmd()
+    document.getElementById("hash-string").innerText = "";
+    document.getElementById("cmd").value = null;
+    document.getElementById("hash-string").innerText = cmd.cmds[0].hash
+    document.getElementById("cmd").value = cmd;
+    openAccordion();
+  }
+
+
+
+  const showHash = function () {
+    disableFields()
+    getHash();
+  }
+
+  const isCrossChain = function (from, to) {
+    if (from!== to){
+      return true;
+    } else return false;
+  }
+
+</script>
 </head>
 <body>
     <div id="main">
         <div class="ui container">
             <img src="https://explorer.chainweb.com/static/1lv9xhxyhlqc262kffl55w08ms1cvxsnrv49zhvm0b799dsi0v0i-kadena-k-logo.png" class="center" style="height:70px">
-            <h1>Kadena Coin Transfer and Create New Account</h1>
-            <div class="ui warning message">
+            <h1>Kadena Coin Transfer</h1>
+            <div id="kadena-warning" class="ui warning message">
+              <i class="close icon"></i>
                 <div class="header">
                     Caution
                 </div>
-                Blockchain transactions are irreversable. If you make a mistake,
-                your coins may not be recoverable. Before you transfer large sums,
+                <p>
+                Blockchain transactions are <b>irreversable</b>. If you make a mistake,
+                your coins <b>may not be recoverable</b>. Before you transfer large sums,
                 it is always best to do a small test transaction first and then
                 send those coins back to the sender to verify that the receiver's
                 account works as expected.
+                </p>
             </div>
-            <form id ="kadena-form" class="ui form">
-                <div class="field">
-                  <label>Chainweb Server</label>
-                  <div id="server-field" class="ui right labeled input">
-                    <input type="text" id="server" placeholder="Enter Your Node Server">
-                    <label class="ui label" id="networkId"></label>
-                  </div>
-                </div>
-                <div class="field">
-                  <label>FROM Account Name</label>
-                  <div id="from-account-div" class="ui right labeled input">
-                    <input type="text" id="from-account" placeholder="Enter FROM Account Name" >
-                    <select id="from-chain-id" class="ui compact dropdown label">
-                      <option value="" selected>Chain ID</option>
-                      <option value="0">Chain 0</option>
-                      <option value="1">Chain 1</option>
-                      <option value="2">Chain 2</option>
-                      <option value="3">Chain 3</option>
-                      <option value="4">Chain 4</option>
-                      <option value="5">Chain 5</option>
-                      <option value="6">Chain 6</option>
-                      <option value="7">Chain 7</option>
-                      <option value="8">Chain 8</option>
-                      <option value="9">Chain 9</option>
-                    </select>
-                  </div>
-                </div>
-                <div class="field">
-                  <label>TO Account Name</label>
-                  <div id="to-account-div" class="ui right labeled input">
-                    <input type="text" id="to-account" placeholder="Enter TO Account Name" >
-                    <select id="to-chain-id" class="ui compact dropdown label">
-                      <option value="" selected>Chain ID</option>
-                      <option value="0">Chain 0</option>
-                      <option value="1">Chain 1</option>
-                      <option value="2">Chain 2</option>
-                      <option value="3">Chain 3</option>
-                      <option value="4">Chain 4</option>
-                      <option value="5">Chain 5</option>
-                      <option value="6">Chain 6</option>
-                      <option value="7">Chain 7</option>
-                      <option value="8">Chain 8</option>
-                      <option value="9">Chain 9</option>
-                    </select>
-                  </div>
-                </div>
-                <div id="account-field" class="field">
-                  <label>TO Public Key</label>
-                  <div id="to-pub-key-div" class="ui right labeled input">
-                    <input type="text" id="to-pub-key" placeholder="Enter To Public Key">
-                    <select id="predicate" class="ui compact dropdown label">
-                      <option class="item" value="keys-all">keys-all</option>
-                      <option class="item" value="keys-any">keys-any</option>
-                    </select>
-                  </div>
-                  <div>
-                    <input id="to-pub-file" type="file" class="ui primary button" onchange="toPubLoad()"/>
-                  </div>
-              </div>
+            <form id ="kadena-form" class="ui form" autocomplete="off">
               <div class="field">
-                    <label>Amount</label>
-                    <input type="text" id="amount" placeholder="Enter Amount To Transfer">
+                <label>Network</label>
+                <div class="ui floating labeled icon dropdown button">
+                  <i class="sync icon"></i>
+                  <span id="network" class="text">Mainnet</span>
+                  <div class="menu">
+                                        <!-- <div class="header">
+                      Add a custom node
+                    </div> -->
+                    <!-- <div class="ui left icon input">
+                      <i class="search icon"></i>
+                      <input placeholder="Enter your node...">
+                    </div>
+                    <div class="divider"></div> -->
+
+                    <div id="network-0" class="item">
+                      <span>Mainnet</span>
+                    </div>
+                    <div id="network-1" class="item">
+                      <span>Testnet</span>
+                    </div>
+                  </div>
                 </div>
-                <div id="signature-field" class="inline fields">
-                    <label>Sign with: </label>
-                    <div class="field">
-                      <div class="ui radio checkbox">
-                        <input type="radio" id="priv-option" name="option" value="privkey" tabindex="0" disabled>
-                        <label>Keypair</label>
+              </div>
+                <div class="field">
+                  <label>Sender</label>
+                  <div class="ui right action left input">
+                    <input type="text" id="fromAccount" placeholder="Enter Account Name of the sender">
+                    <div id="fromIdDropdown" class="ui basic floating compact selection dropdown button chain">
+                      <input type="hidden" value="0" id="fromChainId">
+                      <div class="text">Chain 0</div>
+                      <i class="dropdown icon"></i>
+                      <div class="menu">
+                        <div class="item" data-value="0">Chain 0</div>
+                        <div class="item" data-value="1">Chain 1</div>
+                        <div class="item" data-value="2">Chain 2</div>
+                        <div class="item" data-value="3">Chain 3</div>
+                        <div class="item" data-value="4">Chain 4</div>
+                        <div class="item" data-value="5">Chain 5</div>
+                        <div class="item" data-value="6">Chain 6</div>
+                        <div class="item" data-value="7">Chain 7</div>
+                        <div class="item" data-value="8">Chain 8</div>
+                        <div class="item" data-value="9">Chain 9</div>
                       </div>
                     </div>
-                    <div class="field">
-                      <div class="ui radio checkbox">
-                        <input type="radio" id="sig-option" name="option" value="signature" tabindex="0" disabled>
-                        <label>Signature</label>
+                  </div>
+                </div>
+                <div class="field">
+                  <label>Receiver</label>
+                  <div class="ui right action left input">
+                    <input id="toAccount" type="text" placeholder="Enter Account Name of the receiver">
+                    <div id="toIdDropdown" class="ui basic floating compact selection dropdown button chain">
+                      <input class="default text" value="0" type="hidden" id="toChainId">
+                      <div class="text">Chain 0</div>
+                      <i class="dropdown icon"></i>
+                        <div class="menu">
+                          <div class="item" data-value="0">Chain 0</div>
+                          <div class="item" data-value="1">Chain 1</div>
+                          <div class="item" data-value="2">Chain 2</div>
+                          <div class="item" data-value="3">Chain 3</div>
+                          <div class="item" data-value="4">Chain 4</div>
+                          <div class="item" data-value="5">Chain 5</div>
+                          <div class="item" data-value="6">Chain 6</div>
+                          <div class="item" data-value="7">Chain 7</div>
+                          <div class="item" data-value="8">Chain 8</div>
+                          <div class="item" data-value="9">Chain 9</div>
+                        </div>
+                    </div>
+                  </div>
+                </div>
+              <div id="receiver-keyset" class="field" hidden>
+                <label>Receiver Keyset</label>
+              <div id="receiver-select" class="content" hidden>
+                <div class="ui secondary pointing menu">
+                  <a class="item active" id="basic">
+                    Basic
+                  </a>
+                  <a class="item" id="custom">
+                    Custom
+                  </a>
+                  <!-- <a class="item" id="upload">
+                    Upload
+                  </a> -->
+                </div>
+                <div class="ui segment" id="keyset">
+                  <div id="basic-input" class="field">
+                    <label>Public Key</label>
+                    <div class="ui right action left input">
+                      <input id="basicPublicKey" type="text" placeholder="Enter Receiver Keyset">
+                      <div id="predicateDropdown" class="ui basic floating compact selection dropdown button chain">
+                        <input id="basicPredicate" type="hidden" value="keys-all" id="pred">
+                        <div class="text">keys-all</div>
+                        <i class="dropdown icon"></i>
+                          <div class="menu">
+                            <div class="item" data-value="keys-all">keys-all</div>
+                            <div class="item" data-value="keys-any">keys-any</div>
+                          </div>
                       </div>
                     </div>
+                  </div>
+                  <div id="custom-input" class="field" hidden>
+                    <label>Create a Multi-Sig Keyset.</label>
+                    <textarea id="custom-guard">{"pred": "", "keys": []}</textarea>
+                  </div>
+                  <!-- <div id="upload-input" class="field" hidden>
+                    <label>Upload KDA file</label>
+                    <div>
+                      <input id="to-pub-file" type="file" class="ui primary button" onchange="toPubLoad()"/>
+                    </div>
+                  </div> -->
                 </div>
-                <div class="field" id="signature-input">
-                  <div id="pub-input" class="field" hidden>
-                      <input type="text" id="from-pub-key" placeholder="Enter From Public Key">
-                  </div>
-                  <div id="priv-input" hidden>
-                    <div>
-                      <input type="text" id="from-priv-key" placeholder="Enter From Private key">
-                    </div>
-                    <div>
-                      <input id="priv-file" type="file" class="ui primary button" onchange="PrivLoad()"/>
-                    </div>
-                  </div>
-                  <div id="sig-input" hidden>
-                    <div id="command-box" class="ui compact message result">
-                      <div class="header" >Command to Sign</div>
-                      <p id="raw-command"></p>
-                    </div>
-                    <div>
-                      <input type="text" id="from-signature" placeholder="Enter Signature"></input>
-                    </div>
-                  </div>
-                </div>
-            <div id="acct-err" class="ui center error message"></div>
-            <div id="submit-block" >
-                <button id="submit-button" class="ui primary button" disabled>Make Transfer</button>
+              </div>
+              <div id="receiver-exist" class="ui segment" hidden>
+                <textArea id="receiver-keyset-fixed" readonly></textArea>
+              </div>
             </div>
-          </form>
-          <div id="raw-message" class= "ui compact message hidden"></div>
-          <div id="status-box" class="ui compact message result hidden">
-              <div id="status-message"></div>
-              <div id="request-key"></div>
-              <a id="xchain-div" href="xchain.html" hidden>
-                <button id="xchain-button" class="ui primary button">Finish Transfer</button>
-              </a>
+            <div class="field">
+              <label>Amount</label>
+              <input type="text" id="amount" name="amount" placeholder="Enter Amount To Transfer">
+            </div>
+              <div class="field">
+                  <label>Sign</label>
+                  <div class="ui accordion">
+                    <div class="title" id="sign-button">
+                      <i class="dropdown icon"></i>
+                      Get Hash (Use with signature)
+                    </div>
+                    <div class="content" id="hash-content">
+                      <div class="ui message">
+                        <p style="font-weight:bold;" id="hash-string"></p>
+                      </div>
+                    </div>
+              </div>
+              <br/>
+              <div class="field">
+                <input type="text" id="signature" placeholder="Enter Private Key or Signature">
+              </div>
+              <div id="submit-button" class="ui submit primary button">Make Transfer</div>
+              <div id="reset-button" class="ui button">Reset</div>
+          <div id="acct-err" class="ui center error message" hidden></div>
+          <div id="cmd"></div>
+          <div id="xchain-box" class="ui compact message hidden" hidden>
+            <div class="header" id="x-header"> </div>
+            <p class="header" id="x-message"></p>
           </div>
+          <div id="status-box" class="ui compact message result hidden">
+            <div class="header" id="status-header"></div>
+            <p id="status-message"></p>
+            <p id="status-lookup">Check your transaction: <br/><a id="status-link"/></p>
+          </div>
+          <br/>
+          <div type="text" id="publicKey" hidden />
+          </div>
+        </form>
+
     </div>
 </body>
 <style>
-  .dropdown {
-    margin-bottom: 10px;
-  }
   .container {
+    margin-top: 40px;
     text-align: center;
-    margin-top: 20px;
   }
-  .result {
-   margin-top: 0px;
-  }
-  .check-button {
-    margin-top: 15px;
-  }
-  .ui #server-field  {
-    margin-top: 5px;
-    width: 300px !important;
-  }
-  #signature-field {
-    margin:auto;
-    width: 260px !important;
-    text-align: : center;
-  }
-  .ui #from-pub-key {
-    margin-top: 5px;
-    width: 300px;
-  }
-  .ui #to-pub-key-div {
-    margin-top: 5px;
-    width: 300px;
-  }
-  .ui #to-account {
-    /* width: 300px; */
-  }
-  .ui #chain-id {
-    margin-top: 0px;
-    width: 300px;
-  }
-  .ui #from-chain-id {
-    width: 30px !important;
-  }
-  .ui #to-chain-id {
-    width: 30px;
-  }
-  .ui #from-account {
-    /* width: 300px; */
-  }
-  .ui #amount {
-    margin-top: 5px;
-    width: 300px;
-  }
-  .ui #from-priv-key {
-    margin-top: 5px;
-    width: 300px;
-  }
-  .ui #question {
-    margin-top: 5px;
-    width: 300px;
-  }
-  .ui #account {
-    margin-top: 5px;
-    width: 300px;
-  }
-  .ui #acct-err {
-    margin-top: 10px !important;
-    width: 300px;
+
+  #kadena-form {
     margin: auto;
-    font-size: 13px;
+    text-align: center;
+    width: 400px;
   }
-  .ui #priv-file{
-    width: 300px;
-    height: 40px;
+  a:hover {
+   cursor:pointer;
   }
-  .ui #select-signature {
-    margin-top: 0px;
-    width: 300px;
-  }
-  .ui #signature-input{
-    margin-top: 10px;
-  }
-  .ui #from-signature {
-    margin-top: 5px;
-    width: 300px;
-  }
-  .ui #from-account-div {
-    margin-top: 5px;
-    width: 300px !important;
-  }
-  .ui #to-account-div {
-    margin-top: 5px;
-    width: 300px !important;
-  }
-  .ui #to-pub-file{
-    width: 300px;
-    height: 40px;
-  }
-  .ui #submit-block{
-    margin-top: 10px;
-  }
+
 </style>
 </html>
