@@ -2,9 +2,12 @@
 <head>
     <title>Kadena Transfer Tool</title>
     <script src="https://code.jquery.com/jquery-3.1.1.min.js" crossorigin="anonymous"></script>
+    <link rel="icon" href="https://explorer.chainweb.com/static/img/favicon/0d63dkd822sxczcy51lbhqgflzdxw6lhgf88x2j7kc55hcpk120y-favicon-96x96.png">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
     <script src="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.js"></script>
-    <script src="pact-lang-api-global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pact-lang-api@4.1.2/pact-lang-api-global.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <script>
       function download(data, filename, type) {
         var file = new Blob([data], {type: type});
@@ -45,16 +48,15 @@
           <img src="https://explorer.chainweb.com/static/1lv9xhxyhlqc262kffl55w08ms1cvxsnrv49zhvm0b799dsi0v0i-kadena-k-logo.png" class="center" style="height:70px">
           <h1>Kadena Coin Transfer</h1>
           <div>
-            <a href="transfer-create.html"><button id="submit-button" class="ui primary button">Transfer to a New Account</button></a>
-            <a href="transfer.html"><button id="submit-button" class="ui primary button">Transfer to an Existing Account</button></a>
-          </div>
-          <div style="margin-top:10px;">
-            <button id="gen-button" class="ui primary button">Generate KeyPair (saves to file)</button>
+            <a href="transfer-create.html"><button id="submit-button" class="ui primary button">Transfer</button></a>
             <a href="xchain.html">
               <button id="xchain-button" class="ui primary button">Finish Cross Chain Transfer</button>
             </a>
-            <!-- <a href="address.html"><button id="submit-button" class="ui primary button">Generate Kadena Address</button></a> -->
           </div>
+          <!-- <div style="margin-top:10px;">
+            <button id="gen-button" class="ui primary button">Generate KeyPair (saves to file)</button>
+            <a href="address.html"><button id="submit-button" class="ui primary button">Generate Kadena Address</button></a>
+          </div> -->
     </div>
 </body>
 <style>
