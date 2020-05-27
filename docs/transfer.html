@@ -4,7 +4,8 @@
     <script src="https://code.jquery.com/jquery-3.1.1.min.js" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
     <script src="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.js"></script>
-    <script src="pact-lang-api-global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pact-lang-api@4.1.2/pact-lang-api-global.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script>
 
      //UTILITY FUNCTIONS
@@ -60,24 +61,6 @@
       return true;
     }
 
-    function checkAccountName(accountName) {
-      if (accountName.length<3) {
-        throw "Account name is too short!";
-      }
-      if (accountName.length>256) {
-        throw "Account name is too long!";
-      }
-      return accountName;
-    }
-
-    function checkAmount(amount) {
-      if (isNaN(Number(amount))) {
-        throw "Amount is not a number!";
-      } else if (Number(amount) <= 0) {
-        throw "Amount must be positive!";
-      } else return Number(amount);
-    }
-
     async function getVersion(server){
       try {
         const nodeInfo = await fetch(`https://${server}/info`);
@@ -89,7 +72,6 @@
     }
 
     function verifyNode(node){
-      resetSig();
       getVersion(node)
        .then(networkId => {
           document.getElementById("networkId").classList.remove("red")
@@ -115,12 +97,7 @@
     }
 
     const checkAccount = async (accountName, chainId, server, networkId) => {
-      var host = `https://` + server + `/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
-      try {
-        checkAccountName(accountName);
-      } catch(e){
-        setSigError(e)
-      }
+      var host = `https://${server}/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
       const acct = await getAccountDetails(accountName, host)
       try {
         if (acct.result.status==="success") return true;
@@ -134,16 +111,10 @@
       var accountName = document.getElementById('to-account').value;
       var server = document.getElementById("server").value
       var networkId = document.getElementById("networkId").textContent
-      if (xchain()) await checkAccount(accountName, chainId, server, networkId)
+      if (xchain()) checkAccount(accountName, chainId, server, networkId)
       else if (document.getElementById('from-account').value === accountName &&
                document.getElementById('from-chain-id').value === chainId){
        setSigError("You cannot transfer to the same account")
-      } else {
-        try {
-         checkAccountName(accountName);
-       } catch(e){
-         setSigError(e)
-       }
       }
     }
 
@@ -159,20 +130,12 @@
       }
     }
 
-    const checkToAccount = async (accountName) => {
-      var chainId = document.getElementById('to-chain-id').value;
-      var server = document.getElementById("server").value
-      var networkId = document.getElementById("networkId").textContent
+    const checkToAccount = async (accountName, chainId, server, network) => {
       if (xchain()) checkAccount(accountName, chainId, server, networkId)
       else if (document.getElementById('from-account').value === accountName &&
                document.getElementById('from-chain-id').value === chainId){
         setSigError("You cannot transfer to the same account")
       } else {
-        try {
-         checkAccountName(accountName);
-       } catch(e){
-         setSigError(e)
-       }
       }
     }
 
@@ -190,8 +153,11 @@
       var c;
        if (!apiHost) throw new Error(`Pact.fetch.send(): No apiHost provided`);
        if (sigOption() === "signature")  {
-         const cmd = document.getElementById("raw-command").value
-         c = JSON.parse(cmd.replace("REPLACE THIS WITH SIGNATURE", sendCmd.signature))
+         const cmd = JSON.parse(document.getElementById("raw-command").value)
+         console.log(cmd)
+         cmd.cmds[0].sigs.push({"sig": sendCmd.signature})
+         console.log(cmd)
+         c = cmd
        }
        else {
          c = Pact.simple.exec.createCommand( sendCmd.keyPairs, sendCmd.nonce, sendCmd.pactCode,
@@ -376,7 +342,7 @@
 
     //UI FUNCTIONS
     function disableSubmit() {
-      document.getElementById('submit-button').disabled = true;
+      // document.getElementById('submit-button').disabled = true;
     }
 
     function enableSubmit() {
@@ -449,29 +415,6 @@
         resetSig()//this also disables submit
       }
     }
-
-      async function sigComplete(){
-        console.log("sigcomplete called")
-        try{
-          let check1 = await checkToAccount(document.getElementById('to-account').value)
-          let check2 = await checkToChainId(document.getElementById('to-chain-id').value)
-          let check3 = await checkFromChainId(document.getElementById('to-chain-id').value)
-
-          if ( checkAccountName(document.getElementById('from-account').value) &&
-               checkAccountName(document.getElementById('to-account').value) &&
-               checkAmount(document.getElementById('amount').value) &&
-               check1 && check2 && check3
-               ) {
-               return true;
-          } else {
-            return false;
-          }
-        } catch(e){
-          console.log("sigcomplete catch", e)
-          resetSig();
-        }
-
-      }
 
       function allComplete(){
         if (
@@ -570,19 +513,17 @@
       }}, false);
     }
 
+    function validateInput(){
+      validate("server", "blur", verifyNode);
+      validate("amount", "input", checkAmount);
+      validate("from-signature", "blur", checkSignature);
+    }
+
      // INITIATION FUNCTIONS
      window.addEventListener('load', function (event) {
         document.getElementById("server").value = "us-e1.chainweb.com";
         document.getElementById("networkId").textContent = "mainnet01";
-        validate("server", "input", verifyNode);
-        validate("from-account", "input", checkAccountName);
-        validate("to-account", "input", checkToAccount);
-        validate("amount", "input", checkAmount);
-        validate("from-pub-key", "input", checkKey);
-        validate("from-priv-key", "input", checkSecretKey);
-        validate("from-signature", "input", checkSignature);
-        validate("to-chain-id", "change", checkToChainId);
-        validate("from-chain-id", "change", checkFromChainId);
+        validateInput();
 
        document.getElementById("sig-option").addEventListener("input", function(event) {
          selectSig();
@@ -598,43 +539,43 @@
 
        }, false);
 
-     document.addEventListener('click', async function (event) {
-         if (!event.target.matches('#submit-button')) return;
-         event.preventDefault();
-         var rawPriv = document.getElementById('from-priv-key').value;
-         var priv = rawPriv
-          ? rawPriv.length===128
-            ? rawPriv.slice(0, 64)
-            : document.getElementById('from-priv-key').value
-          : null;
-          console.log(xchain())
-          if (xchain()){
-            initiateXchain(
-                document.getElementById('from-account').value,
-                document.getElementById('to-account').value,
-                "",
-                "",
-                document.getElementById('amount').value,
-                document.getElementById('from-pub-key').value,
-                priv,
-                document.getElementById('server').value,
-                document.getElementById('from-chain-id').value,
-                document.getElementById('to-chain-id').value,
-                document.getElementById('from-signature').value
-              )
-          } else {
-           transfer(
-               document.getElementById('from-account').value,
-               document.getElementById('to-account').value,
-               document.getElementById('amount').value,
-               document.getElementById('from-pub-key').value,
-               priv,
-               document.getElementById('server').value,
-               document.getElementById('from-chain-id').value,
-               document.getElementById('from-signature').value,
-           )
-          }
-     }, false);
+     // document.addEventListener('click', async function (event) {
+     //     if (!event.target.matches('#submit-button')) return;
+     //     event.preventDefault();
+     //     var rawPriv = document.getElementById('from-priv-key').value;
+     //     var priv = rawPriv
+     //      ? rawPriv.length===128
+     //        ? rawPriv.slice(0, 64)
+     //        : document.getElementById('from-priv-key').value
+     //      : null;
+     //      console.log(xchain())
+     //      if (xchain()){
+     //        initiateXchain(
+     //            document.getElementById('from-account').value,
+     //            document.getElementById('to-account').value,
+     //            "",
+     //            "",
+     //            document.getElementById('amount').value,
+     //            document.getElementById('from-pub-key').value,
+     //            priv,
+     //            document.getElementById('server').value,
+     //            document.getElementById('from-chain-id').value,
+     //            document.getElementById('to-chain-id').value,
+     //            document.getElementById('from-signature').value
+     //          )
+     //      } else {
+     //       transfer(
+     //           document.getElementById('from-account').value,
+     //           document.getElementById('to-account').value,
+     //           document.getElementById('amount').value,
+     //           document.getElementById('from-pub-key').value,
+     //           priv,
+     //           document.getElementById('server').value,
+     //           document.getElementById('from-chain-id').value,
+     //           document.getElementById('from-signature').value,
+     //       )
+     //      }
+     // }, false);
 
 
      //FILE UPLOAD FUNCTIONS
@@ -673,6 +614,85 @@
        }
      }
 
+       $(document).ready(function(){
+         $('form')
+           .form({
+             on: 'blur',
+             fields: {
+               fromAccount: {
+                 identifier  : 'fromAccount',
+                 rules: [
+                   {
+                     type   : 'minLength[3]',
+                     prompt : 'Sender Account name is too short!'
+                   },
+                   {
+                     type   : 'maxLength[256]',
+                     prompt : 'Sender Account name is too short!'
+                   }
+                 ]
+               },
+               toAccount: {
+                 identifier  : 'toAccount',
+                 rules: [
+                   {
+                     type   : 'minLength[3]',
+                     prompt : 'Receiver Account name is too short!'
+                   },
+                   {
+                     type   : 'maxLength[256]',
+                     prompt : 'Receiver Account name is too short!'
+                   }
+                 ]
+               },
+               fromChainId: {
+                 identifier  : 'fromChainId',
+                 rules: [
+                   {
+                     type   : 'empty',
+                     prompt : 'Please select a source chain Id'
+                   }
+                 ]
+               },
+               toChainId: {
+                 identifier  : 'toChainId',
+                 rules: [
+                   {
+                     type   : 'empty',
+                     prompt : 'Please select a target chain id'
+                   }
+                 ]
+               },
+               amount: {
+                 identifier  : 'amount',
+                 rules: [
+                   {
+                     type   : 'empty',
+                     prompt : 'Please enter amount'
+                   }
+                 ]
+               },
+               fromPubKey: {
+                 identifier  : 'fromPubKey',
+                 rules: [
+                   {
+                     type   : 'exacLength[64]',
+                     prompt : 'Not a valid public key'
+                   }
+                 ]
+               },
+               fromPrivKey: {
+                 identifier  : 'fromPrivKey',
+                 rules: [
+                   {
+                     type   : 'exacLength[64]',
+                     prompt : 'Not a valid private key'
+                   }
+                 ]
+               }
+             }
+           })
+       });
     </script>
 </head>
 <body>
@@ -701,8 +721,8 @@
                 <div class="field">
                   <label>FROM Account Name</label>
                   <div id="from-account-div" class="ui right labeled input">
-                    <input type="text" id="from-account" placeholder="Enter FROM Account Name" >
-                    <select id="from-chain-id" class="ui compact dropdown label">
+                    <input type="text" name="fromAccount" id="from-account" placeholder="Enter FROM Account Name" >
+                    <select id="from-chain-id" name="fromChainId" class="ui compact dropdown label">
                       <option value="" selected>Chain ID</option>
                       <option value="0">Chain 0</option>
                       <option value="1">Chain 1</option>
@@ -720,8 +740,8 @@
                 <div class="field">
                   <label>TO Account Name</label>
                   <div id="to-account-div" class="ui right labeled input">
-                    <input type="text" id="to-account" placeholder="Enter TO Account Name" >
-                    <select id="to-chain-id" class="ui compact dropdown label">
+                    <input type="text" name="toAccount" id="to-account" placeholder="Enter TO Account Name" >
+                    <select id="to-chain-id" name="toChainId" class="ui compact dropdown label">
                       <option value="" selected>Chain ID</option>
                       <option value="0">Chain 0</option>
                       <option value="1">Chain 1</option>
@@ -738,7 +758,7 @@
                 </div>
                 <div class="field">
                     <label>Amount</label>
-                    <input type="text" id="amount" placeholder="Enter Amount To Transfer">
+                    <input type="text" id="amount" name="amount" placeholder="Enter Amount To Transfer">
                 </div>
                 <div id="signature-field" class="inline fields">
                     <label>Sign with: </label>
@@ -757,11 +777,11 @@
                 </div>
                 <div class="field" id="signature-input">
                   <div id="pub-input" class="field" hidden>
-                      <input type="text" id="from-pub-key" placeholder="Enter From Public Key">
+                      <input name="fromPubKey" type="text" id="from-pub-key" placeholder="Enter From Public Key">
                   </div>
                   <div id="priv-input" hidden>
                     <div>
-                      <input type="text" id="from-priv-key" placeholder="Enter From Private key">
+                      <input name="fromPrivKey" type="text" id="from-priv-key" placeholder="Enter From Private key">
                     </div>
                     <div>
                       <input id="priv-file" type="file" class="ui primary button" onchange="PrivLoad()"/>
@@ -777,10 +797,12 @@
                     </div>
                   </div>
                 </div>
-            <div id="acct-err" class="ui center error message"></div>
             <div id="submit-block" >
-                <button id="submit-button" class="ui primary button" disabled>Make Transfer</button>
+                <div id="submit-button" class="ui primary submit button" >Make Transfer</div>
+                <div class="ui reset button">Reset</div>
+                <div class="ui clear button">Clear</div>
             </div>
+            <div id="acct-err" class="ui center error message"></div>
           </form>
           <div id="raw-message" class= "ui compact message hidden"></div>
           <div id="status-box" class="ui compact message result hidden">
