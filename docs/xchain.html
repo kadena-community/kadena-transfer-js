@@ -4,7 +4,8 @@
     <script src="https://code.jquery.com/jquery-3.1.1.min.js" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
     <script src="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.js"></script>
-    <script src="pact-lang-api-global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pact-lang-api@4.1.2/pact-lang-api-global.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script>
 
      //UTILITY FUNCTIONS
@@ -33,7 +34,7 @@
        return decimal
      }
 
-     const createTime = () =>  Math.round((new Date).getTime()/1000)-60;
+     const createTime = () =>  Math.round((new Date).getTime()/1000)-50;
 
      const checkKey = (key) => {
          if (key.length !== 64) {
@@ -88,7 +89,8 @@
     async function findSrcChain(){
       const pactId = document.getElementById("pact-id").value;
       const server = document.getElementById("server").value;
-      const networkId = document.getElementById("networkId").textContent
+      const networkId = document.getElementById("networkId").textContent;
+      console.log(networkId)
       const pact = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"].reduce(async (arr, chainId) => {
         arr = await arr;
         const host = `https://${server}/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
@@ -149,7 +151,7 @@
            throw proof;
          }
        } catch(e){
-         throw e;
+         throw "Initial transfer is not confirmed yet. Please wait and try again."
        }
      }
 
@@ -275,7 +277,7 @@
     }
 
    function validateServer() {
-     document.getElementById("server").addEventListener('input', function(event) {
+     document.getElementById("server").addEventListener('blur', function(event) {
      clearError();
      hideStatusBox();
      try {
@@ -312,19 +314,23 @@
        }, false);
    }
 
+
+
      // INITIATION FUNCTIONS
      window.addEventListener('load', function (event) {
         if (localStorage.getItem("xchain-server")){
          document.getElementById("server").value = localStorage.getItem("xchain-server");
-         verifyNode(localStorage.getItem("xchain-server"));
+
+         verifyNode(localStorage.getItem("xchain-server")).then(() => {
+           if (localStorage.getItem("xchain-requestKey")){
+              document.getElementById("pact-id").value = localStorage.getItem("xchain-requestKey");
+              getPact();
+            }
+         });
         } else {
           document.getElementById("server").value = "us-e1.chainweb.com";
           document.getElementById("networkId").textContent = "mainnet01";
         }
-        if (localStorage.getItem("xchain-requestKey")){
-         document.getElementById("pact-id").value = localStorage.getItem("xchain-requestKey");
-         getPact();
-       }
         validateServer();
         validatePact();
         document.getElementById("submit-button").addEventListener('click', async function (event) {
