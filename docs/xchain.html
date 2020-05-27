@@ -320,6 +320,7 @@
      window.addEventListener('load', function (event) {
         if (localStorage.getItem("xchain-server")){
          document.getElementById("server").value = localStorage.getItem("xchain-server");
+
          verifyNode(localStorage.getItem("xchain-server")).then(() => {
            if (localStorage.getItem("xchain-requestKey")){
               document.getElementById("pact-id").value = localStorage.getItem("xchain-requestKey");
