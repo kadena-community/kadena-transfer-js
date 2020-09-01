@@ -25,9 +25,13 @@ const transferCrossChainKp = (sender, senderKp) => {
 
 const transferReceiverG = (pubKey) => {return {"receiver-guard": [pubKey]}}
 
-const keepDecimal = decimal =>{
-  const num = decimal.toString().indexOf('.') === -1 ? `${decimal}.0` : decimal
-  return num
+const keepDecimal = decimal => {
+     decimal = decimal.toString();
+     if (decimal.includes('.')) { return decimal }
+     if ((decimal / Math.floor(decimal)) === 1) {
+       decimal = decimal + ".0"
+     }
+     return decimal
 }
 
 function createTransferObj(sender, senderKp, receiver, receiverPubKey, amount, chainId, targetChain){
