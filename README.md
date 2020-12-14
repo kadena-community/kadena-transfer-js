@@ -97,3 +97,11 @@ Cross chain transfer is a more complex transaction than single chain transfer, i
    ```
    node scripts/cross-chain-transfer-offline.js
    ```
+
+## Docker
+
+```
+docker build -t kadenatransfer .
+docker run --name kadenatransfer -p 8181:80 kadenatransfer
+```
+Once built, visit http://localhost:8181
