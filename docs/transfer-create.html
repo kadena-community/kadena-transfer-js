@@ -314,12 +314,12 @@
        let apiHost = (node, networkId, chainId) => `https://${node}/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
        if (document.getElementById("network").innerText === "Mainnet") {
          return {
-           host : apiHost("us-e1.chainweb.com", "mainnet01", chainId),
+           host : apiHost("api.chainweb.com", "mainnet01", chainId),
            networkId: "mainnet01"
          }
        } else if (document.getElementById("network").innerText === "Testnet") {
          return {
-           host : apiHost("us1.testnet.chainweb.com", "testnet04", chainId),
+           host : apiHost("api.testnet.chainweb.com", "testnet04", chainId),
            networkId: "testnet04"
          }
        } else {
