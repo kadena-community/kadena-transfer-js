@@ -208,7 +208,7 @@
          const network = document.getElementById('network').value;
          const account = document.getElementById('from-account').value;
          const pubKey = document.getElementById('to-pub-key').value;
-         const server = (network === "mainnet01" ? "us-e1.chainweb.com" : "us1.testnet.chainweb.com")
+         const server = (network === "mainnet01" ? "api.chainweb.com" : "api.testnet.chainweb.com")
          const host = `https://${server}/chainweb/0.0/${network}/chain/${cid}/pact`
          //if local call fails don't do anything, account does not exist.
          var acctExists = "n";
