@@ -57,9 +57,7 @@
     async function getVersion(server){
       try {
         const nodeInfo = await fetch(`https://${server}/info`);
-          console.log(nodeInfo)
         const nodeInfoJSON = await nodeInfo.json();
-        console.log(nodeInfoJSON)
         return nodeInfoJSON.nodeVersion;
       } catch(e){
         throw(e)
