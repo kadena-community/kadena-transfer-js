@@ -87,7 +87,8 @@
     };
 
     async function findSrcChain(){
-      const pactId = document.getElementById("pact-id").value;
+      let requestKey = document.getElementById("pact-id").value.trim();
+      const pactId = requestKey.length===44 ? requestKey.slice(0,43) : requestKey;
       const server = document.getElementById("server").value;
       const networkId = document.getElementById("networkId").textContent;
       console.log(networkId)
@@ -135,7 +136,8 @@
      var getProof = async function() {
        const chainId = document.getElementById('source-chain-id').textContent;
        const targetChainId = document.getElementById("target-chain-id").textContent;
-       const pactId = document.getElementById("pact-id").value;
+       let requestKey = document.getElementById("pact-id").value.trim();
+       const pactId = requestKey.length===44 ? requestKey.slice(0,43) : requestKey;
        const spvCmd = {"targetChainId": targetChainId, "requestKey": pactId };
        const server = document.getElementById("server").value;
        const networkId = document.getElementById("networkId").textContent
@@ -203,7 +205,8 @@
       try {
         const proof = await getProof();
         const targetChainId = document.getElementById("target-chain-id").textContent;
-        const pactId = document.getElementById("pact-id").value;
+        let requestKey = document.getElementById("pact-id").value.trim();
+        const pactId = requestKey.length===44 ? requestKey.slice(0,43) : requestKey;
         const server = document.getElementById("server").value;
         const networkId = document.getElementById("networkId").textContent
         const host = `https://${server}/chainweb/0.0/${networkId}/chain/${targetChainId}/pact`;
@@ -272,9 +275,10 @@
      }
 
     function complete(){
+      let requestKey = document.getElementById("pact-id").value.trim(); //remove whitespace
       hideStatusBox();
       return document.getElementById("networkId").textContent!== "Not a Chainweb Node"
-              && document.getElementById("pact-id").value.length === 43
+              && (requestKey.length === 43 || (requestKey.length === 44 && requestKey[43] === "="))
     }
 
    function validateServer() {
