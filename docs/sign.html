@@ -1,0 +1,584 @@
+<html>
+<head>
+    <title>Kadena Signing Tool</title>
+    <script src="https://code.jquery.com/jquery-3.1.1.min.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
+    <head>
+    </head>
+    <script src="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pact-lang-api@4.1.2/pact-lang-api-global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/esprima"></script>
+    <script src="https://cdn.jsdelivr.net/npm/js-yaml"></script>
+
+    <script>
+
+    let cmd;
+
+    function isSigsOrPubs(sigs){
+      //Is sigs
+      let sigList;
+      let pubList;
+      if (Array.isArray(sigs)){
+        sigList = sigs.filter(sig => {
+          // console.log(sig)
+          // sig=Object.values(sig)[0];
+          if (sig.hasOwnProperty("sig")) return true;
+          else return false;
+        })
+      } else {
+        pubList = Object.keys(sigs).filter(sig => {
+          if (sig.length === 64) return true;
+          else return false;
+        });
+      }
+
+      if (sigList && sigList.length>0) return "sigs";
+      else if (pubList && pubList.length>0) return "pubs";
+      else return false;
+    }
+
+
+    function capToPact(cap){
+      let args = cap.args.reduce((accum, curr) => {
+        if (typeof curr === "string") {
+          return accum + " " + JSON.stringify(curr);
+        } else return accum + " " + curr;
+      }, "")
+      return `(${cap.name} ${args})`
+    }
+
+    function addSigner (signer,elem, signed) {
+      var clist = document.createElement("div")
+      var header = document.createElement("h5");
+      header.innerText = "Capability: "
+      clist.appendChild(header);
+      elem.appendChild(clist);
+      clist.setAttribute("id", "clist-" + signer.pubKey)
+      var space = document.createElement("br")
+      elem.appendChild(space)
+      if (!signed){
+        var input = document.createElement("div")
+        elem.appendChild(input)
+        input.className="ui fluid input"
+        var inputSig = document.createElement("input");
+        inputSig.setAttribute("id", "input-signature");
+        inputSig.placeholder = "Signature / Private Key";
+        input.setAttribute("id", "input-signature-" + signer.pubKey)
+        input.appendChild(inputSig);
+        inputSig.addEventListener("change", function(e){
+          e.preventDefault();
+          let inputVal = inputSig.value;
+          try {
+            addSig(inputVal, signer.pubKey)
+          } catch(e){
+            showError(e)
+          }
+        });
+      }
+
+      //Attach Signers
+      if (signer.clist){
+        signer.clist.map(signer => {
+          let cap = document.createElement("div");
+          clist.appendChild(cap);
+          cap.className = "item";
+          let capName = document.createElement("div");
+          cap.appendChild(capName);
+          // capName.className = "header";
+          capName.innerText = capToPact(signer);
+        })
+      } else {
+        let cap = document.createElement("div");
+        clist.appendChild(cap);
+        cap.className = "item";
+        let capName = document.createElement("div");
+        cap.appendChild(capName);
+        capName.innerText = "Unrestricted Signing";
+      }
+    };
+
+    function addSigInput(signer){
+      let sigs = Object.keys(JSON.parse(cmd).sigs).map(key => {
+        let obj = {};
+        obj[key] = JSON.parse(cmd).sigs[key];
+        return obj;
+      })
+      let signature = document.getElementById("signature");
+      var sigInput = document.createElement('div');
+      sigInput.className = "item";
+      sigInput.id = `signer-${signer.pubKey}`;
+      signature.appendChild(sigInput);
+      let status;
+      let text;
+      let validSigs;
+
+      if (isSigsOrPubs(JSON.parse(cmd).sigs) === "sigs") {
+        validSigs = sigs.filter(sig => {
+          sig=Object.values(sig)[0];
+           if (sig.hasOwnProperty("sig") && validateSig(JSON.parse(cmd).hash, sig["sig"], signer.pubKey)){
+             return true;
+           }
+         })
+      } else if (isSigsOrPubs(JSON.parse(cmd).sigs) === "pubs"){
+        // sigs = JSON.parse(cmd).sigs;
+        validSigs = Object.values(sigs).filter(sig => {
+          if (sig.hasOwnProperty(signer.pubKey) && validateSig(JSON.parse(cmd).hash, sig[signer.pubKey], signer.pubKey)) {
+            return true;
+          } else return false;
+        })
+      } else {
+        validSigs = [];
+      }
+      //if signer is signed
+      if (validSigs.length>=1) {
+        status = 'ui teal ribbon label'
+        text = "Signed"
+      } else {
+        status = 'ui red ribbon label'
+        text = "Not signed"
+      }
+
+      //Signed / Unsigned Flag
+      let sigFlag = document.createElement("div");
+      sigFlag.className = status;
+      sigFlag.innerText = text;
+      var description = document.createElement("div");
+      description.className="description"
+      addSigner(signer, description, validSigs.length>=1);
+      var pubKey = document.createElement("div");
+      pubKey.className = "ui attached segment";
+      pubKey.appendChild(sigFlag)
+      let keyHeader = document.createElement("h5")
+      let keyContent = document.createElement("p");
+      keyHeader.innerText = "Public Key: ";
+      keyContent.innerText = signer.pubKey;
+      pubKey.appendChild(keyHeader)
+      pubKey.appendChild(keyContent)
+      pubKey.appendChild(description)
+      sigInput.appendChild(pubKey)
+
+      // var input = document.createElement("input");
+      // input.id = `input-${signer.pubKey}`
+      // input.placeholder = "Signature / Private Key"
+    }
+
+    //Show the code, Show the capability of the message.
+    //Max amount of gas.//exception for TRANSFER, GAS
+      function loadYaml(){
+        var errMsg = "Wrong format. Please upload a .yaml private file"
+        try {
+          var files = document.getElementById("yaml-file").files
+          var fileToLoad = document.getElementById("yaml-file").files[0];
+          var fileReader = new FileReader();
+          fileReader.onload = function(fileLoadedEvent){
+            var doc = jsyaml.load(fileLoadedEvent.target.result);
+            var event = new Event('change');
+            document.getElementById("yaml-paste").value = fileLoadedEvent.target.result;
+            document.getElementById("yaml-paste").dispatchEvent(event);
+          };
+          fileReader.readAsText(fileToLoad, "UTF-8");
+        } catch (err) {
+            showError(err.message);
+        }
+      }
+
+      var decodeBase64 = function(s) {
+        validateBase64(s);
+        var i, d = atob(s), b = new Uint8Array(d.length);
+        for (i = 0; i < d.length; i++) b[i] = d.charCodeAt(i);
+        return b;
+      };
+
+function decode(s) {
+  return  s.replace(/-/g, '+')
+              .replace(/_/g, '/')+"=";
+}
+
+      function validateBase64(s) {
+        if (!(/^(?:[A-Za-z0-9+\/]{2}[A-Za-z0-9+\/]{2})*(?:[A-Za-z0-9+\/]{2}==|[A-Za-z0-9+\/]{3}=)?$/.test(s))) {
+          throw new TypeError('invalid encoding');
+        }
+      }
+
+      function validateSig(hash, sig, pubKey){
+          hash = decode(hash)
+          try{
+            if (!sig) return false;
+            console.log(hash,sig,pubKey)
+            let verified = nacl.sign.detached.verify(decodeBase64(hash),Pact.crypto.hexToBin(sig), Pact.crypto.hexToBin(pubKey));
+            console.log(verified)
+            if (verified){
+              return true;
+            } else return false;
+          } catch(e){
+           throw e
+          }
+      }
+
+      function isPriv(sig){
+        if (sig.length === 64) return Pact.crypto.restoreKeyPairFromSecretKey(sig);
+        else if (sig.length === 128) {
+          let secretKey = sig.slice(0,64);
+          let publicKey = sig.slice(64);
+          let restored = Pact.crypto.restoreKeyPairFromSecretKey(secretKey);
+          if (restored.secretKey === secretKey && restored.publicKey === publicKey) {
+            console.log(restored);
+            return restored;
+          }
+        } else {
+          throw "Not a valid key"
+        }
+      }
+
+      function addSig(sig, pubKey){
+        let content= JSON.parse(cmd);
+        let hash=content.hash;
+        let signerOrder = JSON.parse(content.cmd).signers.map(signer => {
+          return signer.pubKey;
+        })
+        let idx = signerOrder.findIndex((key) => key===pubKey);
+        isSigsOrPubs(content.sigs)
+        if (validateSig(hash, sig, pubKey)){
+          if (isSigsOrPubs(content.sigs) === "sigs"
+              ||
+              !isSigsOrPubs(content.sigs)){
+            content.sigs[idx] = {"sig": sig};
+          } else {
+            let signed = {};
+            signed[pubKey]= sig;
+            content.sigs[pubKey] = sig;
+          }
+          cmd = JSON.stringify(content);
+          var event = new Event('change');
+          document.getElementById("yaml-paste").value = jsyaml.safeDump(JSON.parse(cmd));
+          document.getElementById("yaml-paste").dispatchEvent(event);
+        } else if (isPriv(sig)){
+          let privSig = Pact.crypto.sign(hash, isPriv(sig)).sig;
+          if (isSigsOrPubs(content.sigs) ==="sigs" || !isSigsOrPubs(content.sigs)){
+            content.sigs.push({"sig": privSig});
+          } else {
+            let signed = {};
+            signed[pubKey]= privSig;
+            content.sigs[pubKey] = privSig;
+          }
+          cmd = JSON.stringify(content);
+          var event = new Event('change');
+          document.getElementById("yaml-paste").value = jsyaml.safeDump(JSON.parse(cmd));
+          document.getElementById("yaml-paste").dispatchEvent(event);
+        } else {
+          throw "Sig is not valid!"
+        }
+      }
+
+      function showResponse (res) {
+        document.getElementById("server-response").hidden = false;
+        let serverRes = document.getElementById("server-result");
+        serverRes.innerText = res;
+      }
+
+      function showGas (gasCost) {
+        let price= JSON.parse(JSON.parse(cmd).cmd).meta.gasPrice;
+        document.getElementById("gas").hidden = false;
+        let gas = document.getElementById("gas-cost");
+        gas.innerText = gasCost*price;
+      }
+
+      function hideResponse(){
+        document.getElementById("server-response").hidden = true;
+        let serverRes = document.getElementById("server-result");
+        serverRes.innerText = "";
+      }
+
+      function hideGas(){
+        document.getElementById("gas").hidden = true;
+        let gas = document.getElementById("gas-cost");
+        gas.innerText = "";
+      }
+
+     // INITIATION FUNCTIONS
+     window.addEventListener('load', function (event) {
+       cmd = {};
+
+       var mkReq = function(cmd) {
+        return {
+          headers: {
+            "Content-Type": "application/json"
+          },
+          method: "POST",
+          body: JSON.stringify(cmd)
+        };
+      }
+
+      //Add input for server
+       document.getElementById("preview-button").addEventListener("click", async function(e){
+         hideGas();
+         document.getElementById("send-block").hidden = true;
+         e.preventDefault()
+         let apiHost = document.getElementById("server-input").value;
+         let { networkId, meta } = JSON.parse(JSON.parse(cmd).cmd);
+         let localCmd = Object.assign(JSON.parse(cmd));
+         if(isSigsOrPubs(localCmd.sigs)) {
+           localCmd.sigs = Object.values(localCmd.sigs);
+         }
+          let raw = await fetch(`https://${apiHost}/chainweb/0.0/${networkId}/chain/${meta.chainId}/pact/api/v1/local`, mkReq(localCmd));
+          if (raw.ok){
+            let res = await raw.json();
+            if (res.result.data) showResponse(res.result.data)
+            if (res.result.error) showResponse(res.result.error.message)
+            showGas(res.gas);
+            document.getElementById("send-block").hidden = false;
+          } else {
+            let res = await raw.text();
+            document.getElementById("send-block").hidden = true;
+            showResponse(res)
+          }
+       })
+
+       document.getElementById("send-button").addEventListener("click", async function(e){
+         hideGas();
+         e.preventDefault()
+         let apiHost = document.getElementById("server-input").value;
+         let { networkId, meta } = JSON.parse(JSON.parse(cmd).cmd);
+         let localCmd = Object.assign(JSON.parse(cmd));
+         if(isSigsOrPubs(localCmd.sigs)) {
+           localCmd.sigs = Object.values(localCmd.sigs);
+         }
+          let a = await fetch(`https://${apiHost}/chainweb/0.0/${networkId}/chain/${meta.chainId}/pact/api/v1/send`, mkReq({cmds: [localCmd]}));
+          if (a.ok){
+            let res = await a.json();
+            showResponse("Request Key: " + res.requestKeys[0])
+          } else {
+            let res = await a.text();
+            showResponse(res)
+          }
+       })
+
+
+
+       document.getElementById("downloadLink").addEventListener("click", function(){
+         downloadYaml(jsyaml.safeDump(cmd),
+          "signed.yaml",
+          "application/json"
+        );
+       })
+
+
+       function verifyCmd(cmd){
+         if (!cmd.hasOwnProperty("hash")) throw new Error(`Command does not contain hash field`);
+         if (!cmd.hasOwnProperty("sigs")) throw new Error(`Command does not contain sigs field`);
+         if (!cmd.hasOwnProperty("cmd")) throw new Error(`Command does not contain cmd field`);
+         if (cmd.hash !== Pact.crypto.hash(cmd.cmd)) throw new Error(`Command hash does not match content`);
+       }
+
+       document.getElementById("yaml-paste").addEventListener("change", function(e){
+         e.preventDefault();
+         hideResponse();
+         let text = document.getElementById("yaml-paste").value;
+         try {
+           var doc = jsyaml.load(text);
+           var textFromFileLoaded = JSON.stringify(doc);
+           document.getElementById("yaml-content").innerText = textFromFileLoaded;
+           if (doc===undefined) {
+             hideError();
+           }
+           else {
+             //Parse Command and Verify
+             verifyCmd(doc);
+             //Check if sig is list of sigs or object of keys
+             cmd = textFromFileLoaded;
+             document.getElementById("hash-string").innerText = doc.hash
+             document.getElementById("pact-code").innerText = JSON.parse(doc.cmd).payload.exec.code
+             document.getElementById("signature").innerHTML = ""
+
+             //HAVE ALL CAPABILITES & TEXT INPUT
+             JSON.parse(doc.cmd).signers.map(signer => {
+               addSigInput(signer)
+             })
+             showCommand()
+             hideError();
+           }
+         } catch (err) {
+           console.log(err)
+           hideCommand();
+           showError(err)
+         }
+       })
+
+       document.getElementById("yaml-paste").addEventListener("input", function(e){
+         e.preventDefault();
+         hideResponse();
+         let text = document.getElementById("yaml-paste").value;
+         try {
+           var doc = jsyaml.load(text);
+           var textFromFileLoaded = JSON.stringify(doc);
+           document.getElementById("yaml-content").innerText = textFromFileLoaded;
+           if (doc===undefined) {
+             hideError();
+           }
+           else {
+             //Parse Command and Verify
+             verifyCmd(doc);
+             //Check if sig is list of sigs or object of keys
+             cmd = textFromFileLoaded;
+             document.getElementById("hash-string").innerText = doc.hash
+             document.getElementById("pact-code").innerText = JSON.parse(doc.cmd).payload.exec.code
+             document.getElementById("signature").innerHTML = ""
+
+             //HAVE ALL CAPABILITES & TEXT INPUT
+             JSON.parse(doc.cmd).signers.map(signer => {
+               addSigInput(signer)
+             })
+             showCommand()
+             hideError();
+           }
+         } catch (err) {
+           console.log(err)
+           hideCommand();
+           showError(err)
+         }
+       })
+
+
+     }, false);
+
+
+     function downloadYaml(data, filename, type) {
+        var file = new Blob([jsyaml.safeDump(JSON.parse(cmd))], {type: type});
+        if (window.navigator.msSaveOrOpenBlob) // IE10+
+            {window.navigator.msSaveOrOpenBlob(file, filename);}
+        else { // Others
+            var a = document.createElement("a"),
+                    url = URL.createObjectURL(file);
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(function() {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 0);
+        }
+      }
+
+      function downloadJSON(data, filename, type) {
+         var file = new Blob([cmd], {type: type});
+         if (window.navigator.msSaveOrOpenBlob) // IE10+
+             {window.navigator.msSaveOrOpenBlob(file, filename);}
+         else { // Others
+             var a = document.createElement("a"),
+                     url = URL.createObjectURL(file);
+             a.href = url;
+             a.download = filename;
+             document.body.appendChild(a);
+             a.click();
+             setTimeout(function() {
+                 document.body.removeChild(a);
+                 window.URL.revokeObjectURL(url);
+             }, 0);
+         }
+       }
+
+       function showError(e){
+         console.log(e)
+         document.getElementById("error-message").hidden=false;
+         document.getElementById("error-text").innerText = e;
+       }
+
+      function hideError(){
+        console.log("hide error")
+        document.getElementById("error-message").hidden=true;
+        document.getElementById("error-text").value = "";
+      }
+
+      function showCommand(){
+        document.getElementById("command").hidden=false;
+      }
+
+     function hideCommand(){
+       document.getElementById("command").hidden=true;
+     }
+
+
+    </script>
+</head>
+<body>
+    <div id="main">
+        <div class="ui container">
+          <img src="https://explorer.chainweb.com/static/1lv9xhxyhlqc262kffl55w08ms1cvxsnrv49zhvm0b799dsi0v0i-kadena-k-logo.png" class="center" style="height:70px">
+          <h1>Kadena Signing Tool</h1>
+          <form class="ui form" id="ui-form">
+            <h4 class="ui header">1. Upload / paste transaction YAML</h4>
+            <div class="field">
+                <!-- <label>Content</label> -->
+                <!-- PASTE INPUT -->
+                <textarea id="yaml-paste"></textarea>
+                <input id="yaml-file" type="file" accept="application/x-yaml" onChange="loadYaml()" class="inputfile" id="embedpollfileinput" />
+                <div class="ui message" id="yaml-content" hidden/>
+            </div>
+            <a href="#" id="downloadLink">Download Signed Yaml File</a>
+            <br/>
+            <br/>
+            <div id="error-message" class="ui negative message" hidden>
+              <div class="header">
+                Error
+              </div>
+              <p id="error-text"></p>
+            </div>
+            <div id="command" class="field" hidden>
+              <h4 class="ui header">2. Sign transaction with private key / signature</h4>
+              <div class="ui message">
+                <!-- <h5 class="ui header">Command Information</h5> -->
+                <div class="header">HASH: </div> <p id="hash-string"/>
+                <div class="header">CODE: </div> <p id="pact-code"/>
+                <div class="header">SIGNERS: </div>
+                <div id="signature" class="ui divided list"></div>
+              </div>
+
+              <h4 class="ui header">3. Select Network</h4>
+              <div class="ui message">
+                <div class="ui fluid action input">
+                  <input id="server-input" type="text" placeholder="Input a Node..."></input>
+                </div>
+              </div>
+              <div>
+                <div id="preview-button" class="ui primary button">Preview</div>
+              </div>
+              <div id="server-response" hidden>
+                <h4 class="ui header">4. Send Transaction</h4>
+                <div class="ui message">
+                  <div class="ui header">Server Response</div>
+                  <br/>
+                  <div id="server-result"></div>
+                  <h5 id="gas" hidden>Expected Gas Cost: <p id="gas-cost"></p></h5>
+                  <div id="send-block" hidden>
+                    <div id="send-button" class="ui primary button">Send Transaction</div>
+                  </div>
+                </div>
+              </div>
+              <br/>
+            <br/>
+          </div>
+
+          </form>
+        </div>
+      </div>
+    </div>
+</body>
+<style>
+.container {
+  margin-top: 30px;
+  text-align: center;
+}
+.form {
+  margin: auto;
+  margin-top: 30px;
+  width: 700px;
+}
+div.message {
+  text-align: left;
+  overflow: auto;
+}
+</style>
+</html>
