@@ -1,0 +1,29 @@
+{
+  "name": "bundle",
+  "version": "1.0.0",
+  "description": "Temp bundle until we have proper dependencies",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "build": "yarn node build.js",
+    "pack": "yarn webpack",
+    "test": "yarn node test.js"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.15.8",
+    "@babel/preset-env": "^7.15.8",
+    "@ledgerhq/hw-app-kda": "workspace:packages/ledgerjs/packages/hw-app-kda",
+    "@ledgerhq/hw-transport-node-speculos": "workspace:packages/ledgerjs/packages/hw-transport-node-speculos",
+    "Buffer": "^0.0.0",
+    "babel-loader": "^8.2.2",
+    "buffer": "^6.0.3",
+    "live-server": "^1.2.1",
+    "process": "^0.11.10",
+    "webpack": "^4.42.0",
+    "webpack-cli": "^4.9.0"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@webpack-cli/generators": "^2.4.0"
+  }
+}
