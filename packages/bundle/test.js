@@ -2,7 +2,7 @@ import SpeculosTransport from "@ledgerhq/hw-transport-node-speculos";
 
 import Kadena from "@ledgerhq/hw-app-kda";
 
-const apduPort = 8888;
+const apduPort = 9999;
 
 const runTest = async () => {
   const transport = await SpeculosTransport.default.open({apduPort});
