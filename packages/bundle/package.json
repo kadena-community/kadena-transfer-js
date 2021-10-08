@@ -12,9 +12,8 @@
   "devDependencies": {
     "@babel/core": "^7.15.8",
     "@babel/preset-env": "^7.15.8",
-    "@ledgerhq/hw-app-kda": "workspace:packages/ledgerjs/packages/hw-app-kda",
-    "@ledgerhq/hw-transport-node-speculos": "workspace:packages/ledgerjs/packages/hw-transport-node-speculos",
-    "Buffer": "^0.0.0",
+    "@ledgerhq/hw-app-kda": "git+ssh://git@github.com:obsidiansystems/hw-app-kda",
+    "@ledgerhq/hw-transport-node-speculos": "^6.7.0",
     "babel-loader": "^8.2.2",
     "buffer": "^6.0.3",
     "live-server": "^1.2.1",
@@ -24,6 +23,7 @@
   },
   "license": "MIT",
   "dependencies": {
+    "@ledgerhq/hw-transport-webhid": "^6.7.0",
     "@webpack-cli/generators": "^2.4.0"
   }
 }

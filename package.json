@@ -25,8 +25,5 @@
   "devDependencies": {
     "lerna": "^4.0.0",
     "live-server": "^1.2.1"
-  },
-  "workspaces": [
-    "packages/*"
-  ]
+  }
 }

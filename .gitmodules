@@ -1,3 +1,0 @@
-[submodule "packages/ledgerjs"]
-	path = packages/ledgerjs
-	url = https://github.com/obsidiansystems/ledgerjs
