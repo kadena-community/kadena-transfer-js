@@ -3,11 +3,12 @@
     <title>Kadena Transfer Tool</title>
     <link rel="icon" href="https://explorer.chainweb.com/static/img/favicon/0d63dkd822sxczcy51lbhqgflzdxw6lhgf88x2j7kc55hcpk120y-favicon-96x96.png">
     <script src="https://code.jquery.com/jquery-3.1.1.min.js" crossorigin="anonymous"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
+    <!-- <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css"> -->
     <script src="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pact-lang-api@4.1.2/pact-lang-api-global.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../css/TransferStyles.css">
 
     <script>
       //Form Validation
@@ -789,34 +790,113 @@
     } else return false;
   }
 
+
+  function download(data, filename, type) {
+        var file = new Blob([data], {type: type});
+        if (window.navigator.msSaveOrOpenBlob) // IE10+
+            window.navigator.msSaveOrOpenBlob(file, filename);
+        else { // Others
+            var a = document.createElement("a"),
+                    url = URL.createObjectURL(file);
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(function() {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 0);
+        }
+      }
+
+      document.addEventListener('click', async function (event) {
+          if (!event.target.matches('#gen-button')) return;
+          event.preventDefault();
+          var kp = Pact.crypto.genKeyPair();
+          var id = kp.publicKey.substring(0, 6);
+          var priv = `public: ${kp.publicKey}\nsecret: ${kp.secretKey}`
+          var privName = `private-keypair-${id}.kda`
+          var pub = `public: ${kp.publicKey}`
+          var pubName = `public-keypair-${id}.kda`
+          download(priv, privName, "text/plain;charset=utf-8");
+          download(pub, pubName, "text/plain;charset=utf-8");
+      }, false);
+
+      function simpleToggle() {
+        var menuD = document.getElementById("menuDiv");
+        if (menuD.style.display === "none") {
+          menuD.style.display = "block";
+        } else {
+          menuD.style.display = "none";
+        }
+      }
 </script>
 </head>
 <body>
     <div id="main">
-        <div class="ui container">
-            <img src="https://explorer.chainweb.com/static/1lv9xhxyhlqc262kffl55w08ms1cvxsnrv49zhvm0b799dsi0v0i-kadena-k-logo.png" class="center" style="height:70px">
-            <h1>Kadena Coin Transfer</h1>
-            <div id="kadena-warning" class="ui warning message">
-              <i class="close icon"></i>
-                <div class="header">
-                    Caution
-                </div>
-                <p>
-                Blockchain transactions are <b>irreversable</b>. If you make a mistake,
-                your coins <b>may not be recoverable</b>. Before you transfer large sums,
-                it is always best to do a small test transaction first and then
-                send those coins back to the sender to verify that the receiver's
-                account works as expected.
-                </p>
+      <img class="graph" src="../img/graph.png" alt="graph">
+
+      <div class="nav">
+        <h1>Kadena Coin Transfer</h1>
+        <div class="container">
+          <!--<div id="subhead">
+             <a class="headlink" href="xchain.html" >Cross Chain Transfer</span>
+            <span class="headlink current" >Coin Transfer</span> 
+          </div>-->
+        </div>
+        <div class="container-right">
+          <div id="subhead" class="subheadButton">
+            <span class="headlink" onclick="simpleToggle()">
+              <div>Menu</div>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            </span>
+          </div>
+          <span id="menuDiv" class="headlinkContainer" style="display: none;">
+            <a class="headlinkSite" href="transfer-create.html" style="opacity: 0.3;">
+              <div>Coin Transfer</div>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"><path d="M5 12h13M12 5l7 7-7 7"/></svg>
+            </a>
+            <a class="headlinkSite" href="xchain.html">
+              <div>Cross Chain Transfer</div>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"><path d="M16 3h5v5M4 20L20.2 3.8M21 16v5h-5M15 15l5.1 5.1M4 4l5 5"/></svg>
+            </a>
+            <a class="headlinkSite" href="https://balance.chainweb.com">
+              <div>Balance Checker</div>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>           
+             </a>
+            <a class="headlinkSite" href="https://balance.chainweb.com/modules.html">
+              <div>Code Viewer</div>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+            </a>
+            <a class="headlinkSite" id="gen-button" >
+              <div id="gen-button">Generate KeyPair</div>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"><path d="M3 15v4c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2v-4M17 9l-5 5-5-5M12 12.8V2.5"/></svg>         
+            </a>
+          </span>
+        </div>
+      </div>
+      <div class="container">
+        <div id="kadena-warning" class="ui warning message">
+            <div class="header">
+                Caution
             </div>
+            <p>
+            Blockchain transactions are <b>irreversable</b>. If you make a mistake,
+            your coins <b>may not be recoverable</b>. Before you transfer large sums,
+            it is always best to do a small test transaction first.
+            </p>
+        </div>
+      </div>
+      <div class="container">
+       
             <form id ="kadena-form" class="ui form" autocomplete="off">
               <div class="field">
                 <label>Network</label>
-                <div class="ui floating labeled icon dropdown button">
+                <div class="ui floating labeled icon dropdown button" style="z-index: 10;">
                   <i class="sync icon"></i>
                   <span id="network" class="text">Mainnet</span>
                   <div class="menu">
-                                        <!-- <div class="header">
+                    <!-- <div class="header">
                       Add a custom node
                     </div> -->
                     <!-- <div class="ui left icon input">
@@ -825,10 +905,10 @@
                     </div>
                     <div class="divider"></div> -->
 
-                    <div id="network-0" class="item">
+                    <div id="network-0" class="item styledDropdown">
                       <span>Mainnet</span>
                     </div>
-                    <div id="network-1" class="item">
+                    <div id="network-1" class="item styledDropdown">
                       <span>Testnet</span>
                     </div>
                   </div>
@@ -837,7 +917,7 @@
                 <div class="field">
                   <label>Sender</label>
                   <div class="ui right action left input">
-                    <input type="text" id="fromAccount" placeholder="Enter Account Name of the sender">
+                    <input type="text" id="fromAccount" placeholder="Sender Account">
                     <div id="fromIdDropdown" class="ui basic floating compact selection dropdown button chain">
                       <input type="hidden" value="0" id="fromChainId">
                       <div class="text">Chain 0</div>
@@ -870,7 +950,7 @@
                 <div class="field">
                   <label>Receiver</label>
                   <div class="ui right action left input">
-                    <input id="toAccount" type="text" placeholder="Enter Account Name of the receiver">
+                    <input id="toAccount" type="text" placeholder="Receiver Account">
                     <div id="toIdDropdown" class="ui basic floating compact selection dropdown button chain">
                       <input class="default text" value="0" type="hidden" id="toChainId">
                       <div class="text">Chain 0</div>
@@ -903,16 +983,18 @@
               <div id="receiver-keyset" class="field" hidden>
                 <label>Receiver Keyset</label>
               <div id="receiver-select" class="content" hidden>
-                <div class="ui secondary pointing menu">
-                  <a class="item active" id="basic">
-                    Basic
-                  </a>
-                  <a class="item" id="custom">
-                    Custom
-                  </a>
-                  <!-- <a class="item" id="upload">
-                    Upload
-                  </a> -->
+                <div id="receiver-select-container">
+                  <div id="pointingMenu" class="ui secondary pointing menu">
+                    <a class="item active" id="basic">
+                      Basic
+                    </a>
+                    <a class="item" id="custom">
+                      Custom
+                    </a>
+                    <!-- <a class="item" id="upload">
+                      Upload
+                    </a> -->
+                  </div>  
                 </div>
                 <div class="ui segment" id="keyset">
                   <div id="basic-input" class="field">
@@ -967,10 +1049,16 @@
               <div class="field">
                 <input type="text" id="signature" placeholder="Enter Private Key or Signature">
               </div>
-              <div id="submit-button" class="ui submit primary button">Make Transfer</div>
-              <div id="reset-button" class="ui button">Reset</div>
+              <div>
+                <div id="submit-button" class="ui submit primary button">Make Transfer</div>
+                <div id="reset-button" class="ui button">Reset</div>
+
+              </div>
           <div id="acct-err" class="ui center error message" hidden></div>
           <div id="cmd"></div>
+        </form>
+        </div>
+        <div class="container">
           <div id="xchain-box" class="ui compact message hidden" hidden>
             <div class="header" id="x-header"> </div>
             <p class="header" id="x-message"></p>
@@ -982,25 +1070,11 @@
           </div>
           <br/>
           <div type="text" id="publicKey" hidden />
-          </div>
-        </form>
-
+        </div>
     </div>
 </body>
 <style>
-  .container {
-    margin-top: 40px;
-    text-align: center;
-  }
 
-  #kadena-form {
-    margin: auto;
-    text-align: center;
-    width: 400px;
-  }
-  a:hover {
-   cursor:pointer;
-  }
 
 </style>
 </html>

@@ -1,12 +1,15 @@
 <html>
 <head>
     <title>Kadena Transfer Tool</title>
+    <link rel="icon" href="https://explorer.chainweb.com/static/img/favicon/0d63dkd822sxczcy51lbhqgflzdxw6lhgf88x2j7kc55hcpk120y-favicon-96x96.png">
     <script src="https://code.jquery.com/jquery-3.1.1.min.js" crossorigin="anonymous"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
+    <!-- <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css"> -->
     <script src="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pact-lang-api@4.1.2/pact-lang-api-global.min.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script>
+    <link rel="stylesheet" href="../css/styles.css">
+
+  <script>
 
      //UTILITY FUNCTIONS
      const mkReq = (cmd) => {
@@ -110,7 +113,7 @@
       document.getElementById("pact-info").hidden = true;
       if (requestKeys.length === 0){
         document.getElementById("pact-message").setAttribute("class", "ui compact message");
-        document.getElementById("pact-header").textContent = "Request Key could not be found"
+        document.getElementById("pact-header").textContent = "Request Key could not be found, Try again in a few minutes"
       } else {
         try {
           let source = requestKeys[0].chainId
@@ -353,116 +356,171 @@
 
      }, false);
 
-    </script>
+     function download(data, filename, type) {
+        var file = new Blob([data], {type: type});
+        if (window.navigator.msSaveOrOpenBlob) // IE10+
+            window.navigator.msSaveOrOpenBlob(file, filename);
+        else { // Others
+            var a = document.createElement("a"),
+                    url = URL.createObjectURL(file);
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(function() {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 0);
+        }
+      }
+
+      document.addEventListener('click', async function (event) {
+          if (!event.target.matches('#gen-button')) return;
+          event.preventDefault();
+          var kp = Pact.crypto.genKeyPair();
+          var id = kp.publicKey.substring(0, 6);
+          var priv = `public: ${kp.publicKey}\nsecret: ${kp.secretKey}`
+          var privName = `private-keypair-${id}.kda`
+          var pub = `public: ${kp.publicKey}`
+          var pubName = `public-keypair-${id}.kda`
+          download(priv, privName, "text/plain;charset=utf-8");
+          download(pub, pubName, "text/plain;charset=utf-8");
+      }, false);
+
+      function simpleToggle() {
+        var menuD = document.getElementById("menuDiv");
+        if (menuD.style.display === "none") {
+          menuD.style.display = "block";
+        } else {
+          menuD.style.display = "none";
+        }
+      }
+  </script>
 </head>
 <body>
     <div id="main">
-        <div class="ui container">
-            <img src="https://explorer.chainweb.com/static/1lv9xhxyhlqc262kffl55w08ms1cvxsnrv49zhvm0b799dsi0v0i-kadena-k-logo.png" class="center" style="height:70px">
-            <h1>Finish Cross Chain Transfer</h1>
+      <img class="graph" src="../img/graph.png" alt="graph">
+
+      <div class="nav">
+        <h1>Finish Cross Chain Transfer</h1>
+        <div class="container">
+          <!-- <div id="subhead">
+            <span class="headlink current">Cross Chain Transfer</span>
+            <a class="headlink" href="transfer-create.html">Coin Transfer</a>
+          </div> -->
+        </div>
+        <div class="container-right">
+          <div id="subhead" class="subheadButton">
+            <span class="headlink" onclick="simpleToggle()">
+              <div>Menu</div>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            </span>
+          </div>
+          <span id="menuDiv" class="headlinkContainer" style="display: none;">
+            <a class="headlinkSite" href="transfer-create.html">
+              <div>Coin Transfer</div>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"><path d="M5 12h13M12 5l7 7-7 7"/></svg>
+            </a>
+            <a class="headlinkSite" href="xchain.html" style="opacity: 0.3;">
+              <div>Cross Chain Transfer</div>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"><path d="M16 3h5v5M4 20L20.2 3.8M21 16v5h-5M15 15l5.1 5.1M4 4l5 5"/></svg>
+            </a>
+            <a class="headlinkSite" href="https://balance.chainweb.com">
+              <div>Balance Checker</div>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>           
+             </a>
+            <a class="headlinkSite" href="https://balance.chainweb.com/modules.html">
+              <div>Code Viewer</div>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+            </a>
+            <a class="headlinkSite" id="gen-button" >
+              <div id="gen-button">Generate KeyPair</div>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"><path d="M3 15v4c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2v-4M17 9l-5 5-5-5M12 12.8V2.5"/></svg>         
+            </a>
+          </span>
+        </div>
+      </div>
+
+        <div class="container">
+
             <form id ="kadena-form" class="ui form">
-                <div class="field">
+
+              <div id="node-field" class="field ">
                   <label>Chainweb Server</label>
                   <div id="server-field" class="ui right labeled input">
                     <input type="text" id="server" placeholder="Enter Your Node Server">
                     <label class="ui label" id="networkId"></label>
                   </div>
                 </div>
-                <div class="field">
-                    <label>Request Key</label>
+                <div id="account-field" class="field">
+                  <label>Request Key</label>
                     <input type="text" id="pact-id" placeholder="Enter Request Key">
                 </div>
-            <div id="pact-message" class= "ui compact message hidden">
-              <div class="header" id="pact-header"></div>
-              <ul id="pact-info">
-                <p>Source Chain: <span id="source-chain-id"/></p>
-                <p>Target Chain: <span id="target-chain-id"/></p>
-                <p>Sender: <span id="sender"/></span>
-                <p>Receiver: <span id="receiver"/></span>
-                <p>Receiver Guard: <span id="rg"/></span>
-                <p>Amount: <span id="amount"/></span>
-              </ul>
-            </div>
-            <div id="submit-block" >
-                <button id="submit-button" class="ui primary button" disabled>Finish Cross Chain Transfer</button>
-            </div>
-            <div id="acct-err" class="ui center error message"></div>
-            <div id="result-message" class= "ui compact message hidden">
-            </div>
-          </form>
+              </form>
+        </div>
+
+        <div class="container">
+
+          <label class="header " id="pact-header"></label>
+          <div id="pact-message" class= "ui compact message hidden">
+
+            <ul id="pact-info">
+              <div class="div-sender">
+                <p class="lable-text">Source Chain <span class="white-lable-text" id="source-chain-id"/></p>
+                <p class="lable-text">Sender <span class="white-lable-text" id="sender"/></span>
+              </div>
+              <div class="div-target">
+                <p class="lable-text">Target Chain <span class="white-lable-text" id="target-chain-id"/></p>
+                <p class="lable-text">Receiver: <span class="white-lable-text" id="receiver"/></span>
+              </div>
+              <div class="div-amount">
+                <p class="lable-text">Amount <span class="white-lable-text" id="amount"/></span>
+              </div>
+              <div class="div-guard">
+                <p class="lable-text">Receiver Guard <span class="white-lable-text" id="rg"/></span>
+              </div>
+
+
+
+            </ul>
+          
+          </div>
+
+          <div id="submit-block" >
+            <button id="submit-button" class="ui primary button" disabled>Finish Cross Chain Transfer</button>
+          </div>
+
+          <div id="acct-err" class="ui center error message"></div>
+          <div id="result-message" class= "ui compact message hidden">
+          </div>
           <div id="status-box" class="ui compact message result hidden">
               <div id="reqkey-box">
-                <div class="header"> Request Key </div>
+                <div class="lable-text" class="header"> Request Key </div>
                 <p id="request-key"/>
               </div>
               <br/>
               <div>
-                <div class="header" id="status-message"></div>
+                <div  id="status-message"></div>
                 <p id="status-error">
-                <button id="listen-button" class="ui button" disabled>Listen Again</button>
+                <button id="listen-button" class="button listen-button" disabled>Listen Again</button>
               </div>
-
           </div>
 
+        </div>
+          
     </div>
 </body>
 <style>
+@media screen and (max-width: 1604px) {
+  .headlinkContainer{
+    top: 7rem;
+  }
+}
+@media screen and (max-width: 854px) {
+  .headlinkContainer{
+    top: 8rem;
+  }
+}
 
-  .dropdown {
-    margin-bottom: 10px;
-  }
-  .container {
-    text-align: center;
-    margin-top: 20px;
-  }
-  .result {
-   margin-top: 0px;
-  }
-  .check-button {
-    margin-top: 15px;
-  }
-  .ui #server-field  {
-    margin-top: 5px;
-    width: 300px !important;
-  }
-  .ui #pact-id {
-    margin-top: 5px;
-    width: 300px;
-  }
-  .ui #target-chain-id {
-    margin-top: 0px;
-    width: 300px;
-  }
-  .ui #source-chain-id {
-    margin-top: 0px;
-    width: 300px;
-  }
-  .ui #account {
-    margin-top: 5px;
-    width: 300px;
-  }
-  .ui #submit-block {
-    margin-top: 5px;
-  }
-  .ui #proof-block {
-    margin-top: 5px;
-  }
-  #proof-message {
-    width: 800px;
-    overflow-wrap: break-word;
-  }
-  #pact-info p{
-    font-weight: bold;
-  }
-  #pact-info{
-    padding: 0 !important;
-  }
-  #pact-info span{
-    font-weight: normal;
-  }
-  #listen-button{
-    margin-top: 10px;
-  }
-
-</style>
+</style> 
 </html>
