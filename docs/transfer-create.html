@@ -337,6 +337,12 @@
        }
      }
 
+     async function wait(ms = 1000) {
+       return new Promise(resolve => {
+         setTimeout(resolve, ms);
+       });
+     }
+
      async function submit() {
        clearError();
        let cmd = document.getElementById("cmd").value
@@ -384,13 +390,14 @@
                  const spvCmd = {"targetChainId": targetChainId, "requestKey": pactId };
                  let proof;
                  while (!proof){
-                   const res =  await fetch(`${apiHost}/spv`, mkReq(spvCmd));
+                   await wait(2500);
+                   const res = await fetch(`${apiHost}/spv`, mkReq(spvCmd));
                    let foo = await res;
                    if (foo.ok){
                      proof = await res.json();
                    }
                  }
-                 const m = Pact.lang.mkMeta("free-x-chain-gas", targetChainId, 0.000000000001, 400, createTime(), 28800);
+                 const m = Pact.lang.mkMeta("free-x-chain-gas", targetChainId, 0.00000001, 400, createTime(), 28800);
                  const contCmd = {type: "cont", keyPairs:[],pactId: pactId, rollback: false, step: 1, meta: m, proof: proof, networkId: networkId}
                  const cmd = Pact.simple.cont.createCommand( contCmd.keyPairs, contCmd.nonce, contCmd.step, contCmd.pactId,
                                                           contCmd.rollback, contCmd.envData, contCmd.meta, contCmd.proof, contCmd.networkId);
