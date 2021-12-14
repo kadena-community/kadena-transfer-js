@@ -2317,7 +2317,7 @@ async function main() {
   process.exit()
 }
 
-main().catch(e => console.error(e));
+//main().catch(e => console.error(e));
 
 }).call(this)}).call(this,require('_process'))
 },{"./Kadena.js":1,"@ledgerhq/hw-transport-node-speculos":7,"@ledgerhq/hw-transport-webhid":9,"@ledgerhq/hw-transport-webusb":10,"_process":171}],3:[function(require,module,exports){
