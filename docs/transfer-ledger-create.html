@@ -208,6 +208,9 @@
          $(`.ui .segment #${e.target.id}-input`).attr("hidden", false)
        });
 
+       $("#stoink-button").on('click',function(){
+            getWebhid();
+       });
        //Activate Dropdown
        $('.dropdown')
          .dropdown();
@@ -284,7 +287,11 @@
      function formIsValid(){
        return $('.form').form('is valid');
      }
-
+    
+     function getWebhid(){
+        alert("click");
+     }
+    
      function reset(){
        clearError()
        $('.form').form('reset');
@@ -970,7 +977,7 @@
               <div class="field">
                 <input type="text" id="signature" placeholder="Enter Private Key or Signature">
               </div>
-              <div  onClick="console.log(Ledger)" id="stoink-button" class="ui submit primary button">Stoink</div>
+              <div id="stoink-button" class="ui submit primary button">Stoink</div>
               <div id="submit-button" class="ui submit primary button">Make Transfer</div>
               <div id="reset-button" class="ui button">Reset</div>
           <div id="acct-err" class="ui center error message" hidden></div>
