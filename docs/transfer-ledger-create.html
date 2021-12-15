@@ -207,10 +207,6 @@
          $(`.ui .segment .field`).attr("hidden", true)
          $(`.ui .segment #${e.target.id}-input`).attr("hidden", false)
        });
-
-       $("#stoink-button").on('click',function(){
-            getWebhid();
-       });
        //Activate Dropdown
        $('.dropdown')
          .dropdown();
@@ -237,6 +233,10 @@
 
      // INITIATION FUNCTIONS
      window.addEventListener('load', function (event) {
+       document.getElementById("stoink-button").addEventListener("click", async function(e){
+            getWebhid();
+       })
+       
        document.getElementById("fromAccount").addEventListener("blur", async function(e){
          fetchSenderKeyset();
        })
@@ -288,8 +288,12 @@
        return $('.form').form('is valid');
      }
     
-     function getWebhid(){
-        alert("click");
+     async function getWebhid(){
+        window.TranspWeb.create(transp => {
+            const kda = new window.Kadena(transp);
+            //TODO: Figure out the parameters
+            document.getElementById("signature").value = kda.signTransaction("","");
+        })
      }
     
      function reset(){
