@@ -119,7 +119,7 @@ exports["default"] = HttpTransport;
 
 }).call(this)}).call(this,require("buffer").Buffer)
 },{"@ledgerhq/errors":4,"@ledgerhq/hw-transport":5,"@ledgerhq/logs":6,"axios":7,"buffer":37}],2:[function(require,module,exports){
-var HttpTransp = require("./common.js")
+var HttpTransp = require("./common.js").default;
 
 function load_modules(){
     window.HttpTransp = HttpTransp; 
