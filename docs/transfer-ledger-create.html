@@ -288,17 +288,21 @@
      function formIsValid(){
        return $('.form').form('is valid');
      }
-    
+
      async function getWebhid(){
         var cmd = getTransferCmd();
-        var hash = cmd.cmds[0].hash;
-        console.log(hash);
-        window.TranspWeb.create(transp => {
+        var txn = cmd.cmds[0];
+        console.log(txn);
+        //window.TranspWeb.create(transp => {
+        //    const kda = new window.Kadena(transp);
+        //    document.getElementById("signature").value = kda.signTransaction("m/44'/626'/0'",hash).signature;
+        //})
+        window.HttpTransp.open("http://localhost:5000").then(transp => {
             const kda = new window.Kadena(transp);
-            //TODO: Figure out the parameters
-            //BIP32 path for Kadena
-            document.getElementById("signature").value = kda.signTransaction("m/44'/626'/0'",hash).signature;
-        })
+            var signed = kda.signTransaction("m/44'/626'/0'",JSON.stringify(txn));
+	    document.getElementById("signature").value = signed.signature;
+	    console.log(kda);
+        });
      }
     
      function reset(){
