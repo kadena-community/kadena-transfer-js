@@ -297,7 +297,7 @@
         //    const kda = new window.Kadena(transp);
         //    document.getElementById("signature").value = kda.signTransaction("m/44'/626'/0'",hash).signature;
         //})
-        window.HttpTransp.open("http://localhost:5000").then(transp => {
+        window.HttpTransp.open("http://localhost:5000/apdu").then(transp => {
             const kda = new window.Kadena(transp);
             var signed = kda.signTransaction("m/44'/626'/0'",txn);
 	    document.getElementById("signature").value = signed.signature;
