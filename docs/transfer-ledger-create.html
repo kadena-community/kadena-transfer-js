@@ -291,7 +291,7 @@
 
      async function getWebhid(){
         var cmd = getTransferCmd();
-        var txn = cmd.cmds[0];
+        var txn = cmd.cmds[0].cmd;
         console.log(txn);
         //window.TranspWeb.create(transp => {
         //    const kda = new window.Kadena(transp);
@@ -299,7 +299,7 @@
         //})
         window.HttpTransp.open("http://localhost:5000").then(transp => {
             const kda = new window.Kadena(transp);
-            var signed = kda.signTransaction("m/44'/626'/0'",JSON.stringify(txn));
+            var signed = kda.signTransaction("m/44'/626'/0'",txn);
 	    document.getElementById("signature").value = signed.signature;
 	    console.log(kda);
         });
