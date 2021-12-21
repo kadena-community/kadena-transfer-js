@@ -292,18 +292,17 @@
      async function getWebhid(){
         var cmd = getTransferCmd();
         var txn = cmd.cmds[0].cmd;
-        console.log(txn);
+        //console.log(txn);
         //window.TranspWeb.create(transp => {
         //    const kda = new window.Kadena(transp);
         //    document.getElementById("signature").value = kda.signTransaction("m/44'/626'/0'",hash).signature;
         //})
-        window.HttpTransp.open("http://localhost:5000/apdu").then(transp => {
-            const kda = new window.Kadena(transp);
-            var signed = await kda.signTransaction("m/44'/626'/0'",txn);
-            var sig = signed.signature;
-	        document.getElementById("signature").value = sig.slice(0,64);
-	        console.log(sig);
-        });
+        var transp = await window.HttpTransp.open("http://localhost:5000/apdu");
+        const kda = new window.Kadena(transp);
+        var signed = await kda.signTransaction("m/44'/626'/0'",txn);
+        var sig = signed.signature;
+        document.getElementById("signature").value = sig.slice(0,64);
+        console.log(sig);
      }
     
      function reset(){
