@@ -299,9 +299,10 @@
         //})
         window.HttpTransp.open("http://localhost:5000/apdu").then(transp => {
             const kda = new window.Kadena(transp);
-            var signed = kda.signTransaction("m/44'/626'/0'",txn);
-	    document.getElementById("signature").value = signed.signature;
-	    console.log(kda);
+            var signed = await kda.signTransaction("m/44'/626'/0'",txn);
+            var sig = signed.signature;
+	        document.getElementById("signature").value = sig.slice(0,64);
+	        console.log(sig);
         });
      }
     
