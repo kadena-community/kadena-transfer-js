@@ -293,11 +293,6 @@
         var cmd = getTransferCmd();
         var txn = new TextEncoder().encode(cmd.cmds[0].cmd);
         console.log(txn);
-        //console.log(txn);
-        //window.TranspWeb.create(transp => {
-        //    const kda = new window.Kadena(transp);
-        //    document.getElementById("signature").value = kda.signTransaction("m/44'/626'/0'",hash).signature;
-        //})
         if (!window.ledger) {
           var transp = await window.TranspWeb.create();
           window.ledger = new window.Kadena(transp);
