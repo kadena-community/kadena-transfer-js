@@ -4,7 +4,7 @@
   "description": "Simple Javascript tools to transfer Kadena coins",
   "main": "scripts",
   "scripts": {
-    "build-ledger": "cd packages/bundle; yarn; yarn build; cp dist/main.js ../../js/ledger.js",
+    "build-ledger": "cd packages/bundle; yarn; yarn build; cp dist/main.js ../../util/ledger-os.js",
     "transfer-online": "node ./scripts/transfer-online.js",
     "transfer-create-online": "node ./scripts/transfer-create-online.js",
     "transfer-offline": "node ./scripts/transfer-offline.js",
