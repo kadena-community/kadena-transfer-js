@@ -299,7 +299,7 @@
         }  
         var signed = await window.ledger.signTransaction("m/44'/626'/0'",txn);
         var sig = signed.signature;
-        document.getElementById("signature").value = sig.slice(0,64);
+        document.getElementById("signature").value = sig;
         console.log(sig);
      }
     
