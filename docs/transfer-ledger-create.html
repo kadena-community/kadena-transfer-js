@@ -7,8 +7,8 @@
     <script src="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pact-lang-api@4.1.2/pact-lang-api-global.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
-    <script src="../../util/ledger-os.js"></script>
-    <script src="../../util/httptransp.js"></script>
+    <script src="../util/ledger-os.js"></script>
+    <script src="../util/httptransp.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <script>
@@ -234,7 +234,7 @@
 
      // INITIATION FUNCTIONS
      window.addEventListener('load', function (event) {
-       document.getElementById("stoink-button").addEventListener("click", async function(e){
+       document.getElementById("getSig-button").addEventListener("click", async function(e){
             getWebhid();
        })
        
@@ -291,15 +291,18 @@
 
      async function getWebhid(){
         var cmd = getTransferCmd();
-        var txn = cmd.cmds[0].cmd;
+        var txn = new TextEncoder().encode(cmd.cmds[0].cmd);
+        console.log(txn);
         //console.log(txn);
         //window.TranspWeb.create(transp => {
         //    const kda = new window.Kadena(transp);
         //    document.getElementById("signature").value = kda.signTransaction("m/44'/626'/0'",hash).signature;
         //})
-        var transp = await window.HttpTransp.open("http://localhost:5000/apdu");
-        const kda = new window.Kadena(transp);
-        var signed = await kda.signTransaction("m/44'/626'/0'",txn);
+        if (!window.ledger) {
+          var transp = await window.TranspWeb.create();
+          window.ledger = new window.Kadena(transp);
+        }  
+        var signed = await window.ledger.signTransaction("m/44'/626'/0'",txn);
         var sig = signed.signature;
         document.getElementById("signature").value = sig.slice(0,64);
         console.log(sig);
@@ -990,7 +993,7 @@
               <div class="field">
                 <input type="text" id="signature" placeholder="Enter Private Key or Signature">
               </div>
-              <div id="stoink-button" class="ui submit primary button">Stoink</div>
+              <div id="getSig-button" class="ui submit primary button">Sign with Ledger</div>
               <div id="submit-button" class="ui submit primary button">Make Transfer</div>
               <div id="reset-button" class="ui button">Reset</div>
           <div id="acct-err" class="ui center error message" hidden></div>
