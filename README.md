@@ -98,6 +98,17 @@ Cross chain transfer is a more complex transaction than single chain transfer, i
    node scripts/cross-chain-transfer-offline.js
    ```
 
+### Update ledger-os.js (Bundled dependencies)
+
+ Sometimes all ledger dependencies gets updates in their repos so we need
+ to get the file ledger-os.js updated as well. 
+
+ To do this we need follow those steps:
+ - cd ledger-bundle 
+ - npm run-script build
+ 
+ The desired file should appear on the util folder.
+ 
 ## Docker
 
 ```
