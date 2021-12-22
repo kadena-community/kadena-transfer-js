@@ -104,6 +104,7 @@ Cross chain transfer is a more complex transaction than single chain transfer, i
  to get the file ledger-os.js updated as well. 
 
  To do this we need follow those steps:
+ - install browserify globally
  - cd ledger-bundle 
  - npm run-script build
  
