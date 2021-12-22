@@ -1,98 +1,18 @@
 {
-  "requires": true,
-  "lockfileVersion": 1,
+  "name": "ledger-bundle",
+  "version": "0.0.0",
+  "description": "A bundler for ledger related hardware (Kadena)",
+  "main": "main.js",
+  "scripts": {
+    "build": "browserify main.js -p [ tsify --noImplicitAny ] > ../util/ledger-os.js"
+  },
+  "author": "Alexandre Garcia de Oliveira (Romefeller)",
+  "license": "ISC",
   "dependencies": {
-    "@ledgerhq/devices": {
-      "integrity": "sha512-xk/6JGrFP/c8aMK4O2fKZFJGH3STynwnIRy6si/400r5p3kJmoyR6h16U954EYcCbyScrVdtDYnZKLTUCbtAIQ==",
-      "requires": {
-        "@ledgerhq/errors": "^6.10.0",
-        "@ledgerhq/logs": "^6.10.0",
-        "rxjs": "6",
-        "semver": "^7.3.5"
-      },
-      "resolved": "https://registry.npmjs.org/@ledgerhq/devices/-/devices-6.19.0.tgz",
-      "version": "6.19.0"
-    },
-    "@ledgerhq/errors": {
-      "integrity": "sha512-fQFnl2VIXh9Yd41lGjReCeK+Q2hwxQJvLZfqHnKqWapTz68NHOv5QcI0OHuZVNEbv0xhgdLhi5b65kgYeQSUVg==",
-      "resolved": "https://registry.npmjs.org/@ledgerhq/errors/-/errors-6.10.0.tgz",
-      "version": "6.10.0"
-    },
-    "@ledgerhq/hw-transport": {
-      "integrity": "sha512-B16iNtLb3BS+PlqKU1b6eLzOa8Os03SdeUQUYJrqc8XCqNMHJvpQxSvWVbqZFvRS5Cu991usVsCTFrPtOqaCeQ==",
-      "requires": {
-        "@ledgerhq/devices": "^6.19.0",
-        "@ledgerhq/errors": "^6.10.0",
-        "events": "^3.3.0"
-      },
-      "resolved": "https://registry.npmjs.org/@ledgerhq/hw-transport/-/hw-transport-6.19.0.tgz",
-      "version": "6.19.0"
-    },
-    "@ledgerhq/hw-transport-node-speculos": "^6.19.0",
-    "@ledgerhq/hw-transport-webhid": "^6.19.0",
-    "@ledgerhq/hw-transport-webusb": "^6.19.0",
-    "@ledgerhq/logs": {
-      "integrity": "sha512-lLseUPEhSFUXYTKj6q7s2O3s2vW2ebgA11vMAlKodXGf5AFw4zUoEbTz9CoFOC9jS6xY4Qr8BmRnxP/odT4Uuw==",
-      "resolved": "https://registry.npmjs.org/@ledgerhq/logs/-/logs-6.10.0.tgz",
-      "version": "6.10.0"
-    },
-    "base64-js": {
-      "integrity": "sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==",
-      "resolved": "https://registry.npmjs.org/base64-js/-/base64-js-1.5.1.tgz",
-      "version": "1.5.1"
-    },
-    "events": {
-      "integrity": "sha512-mQw+2fkQbALzQ7V0MY0IqdnXNOeTtP4r0lN9z7AAawCXgqea7bDii20AYrIBrFd/Hx0M2Ocz6S111CaFkUcb0Q==",
-      "resolved": "https://registry.npmjs.org/events/-/events-3.3.0.tgz",
-      "version": "3.3.0"
-    },
+    "@ledgerhq/hw-transport-node-speculos": "^6.20.0",
+    "@ledgerhq/hw-transport-webhid": "^6.20.0",
+    "@ledgerhq/hw-transport-webusb": "^6.20.0",
     "hw-app-kda": "git+https://github.com/obsidiansystems/hw-app-kda.git",
-    "hw-app-obsidian-common": {
-      "integrity": "sha512-QSOtiVpSJDTYn9/qMblDwVs/H1FIw/WIs2W+cNaI1yzcNLv9aHx44L5ReEz+aZF2613XfkQ5e9HJxI4LxEKS8g==",
-      "requires": {
-        "@ledgerhq/hw-transport": "^6.3.0"
-      },
-      "resolved": "https://registry.npmjs.org/hw-app-kda/-/hw-app-kda-0.0.0.tgz",
-      "version": "0.0.0"
-    },
-    "ieee754": {
-      "integrity": "sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA==",
-      "resolved": "https://registry.npmjs.org/ieee754/-/ieee754-1.2.1.tgz",
-      "version": "1.2.1"
-    },
-    "lru-cache": {
-      "integrity": "sha512-Jo6dJ04CmSjuznwJSS3pUeWmd/H0ffTlkXXgwZi+eq1UCmqQwCh+eLsYOYCwY991i2Fah4h1BEMCx4qThGbsiA==",
-      "requires": {
-        "yallist": "^4.0.0"
-      },
-      "resolved": "https://registry.npmjs.org/lru-cache/-/lru-cache-6.0.0.tgz",
-      "version": "6.0.0"
-    },
-    "rxjs": {
-      "integrity": "sha512-hTdwr+7yYNIT5n4AMYp85KA6yw2Va0FLa3Rguvbpa4W3I5xynaBZo41cM3XM+4Q6fRMj3sBYIR1VAmZMXYJvRQ==",
-      "requires": {
-        "tslib": "^1.9.0"
-      },
-      "resolved": "https://registry.npmjs.org/rxjs/-/rxjs-6.6.7.tgz",
-      "version": "6.6.7"
-    },
-    "semver": {
-      "integrity": "sha512-PoeGJYh8HK4BTO/a9Tf6ZG3veo/A7ZVsYrSA6J8ny9nb3B1VrpkuN+z9OE5wfE5p6H4LchYZsegiQgbJD94ZFQ==",
-      "requires": {
-        "lru-cache": "^6.0.0"
-      },
-      "resolved": "https://registry.npmjs.org/semver/-/semver-7.3.5.tgz",
-      "version": "7.3.5"
-    },
-    "tslib": {
-      "integrity": "sha512-Xni35NKzjgMrwevysHTCArtLDpPvye8zV/0E4EyYn43P7/7qvQwPh9BGkHewbMulVntbigmcT7rdX3BNo9wRJg==",
-      "resolved": "https://registry.npmjs.org/tslib/-/tslib-1.14.1.tgz",
-      "version": "1.14.1"
-    },
-    "yallist": {
-      "integrity": "sha512-3wdGidZyq5PB084XLES5TpOSRA3wjXAlIWMhum2kRcv/41Sn2emQ0dycQW4uZXLejwKvg6EsvbdlVL+FYEct7A==",
-      "resolved": "https://registry.npmjs.org/yallist/-/yallist-4.0.0.tgz",
-      "version": "4.0.0"
-    }
+    "tsify": "^5.0.4"
   }
 }
