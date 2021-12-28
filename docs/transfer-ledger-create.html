@@ -290,17 +290,17 @@
      }
 
      async function getWebhid(){
-        var cmd = getTransferCmd();
-        var txn = new TextEncoder().encode(cmd.cmds[0].cmd);
-        console.log(txn);
         if (!window.ledger) {
           var transp = await window.TranspWeb.create();
           window.ledger = new window.Kadena(transp);
-        }  
+        }
+        document.getElementById("publicKey").value = [ (await window.ledger.getPublicKey("44'/626'/0'")).publicKey ];
+        getHash();
+        var cmd = document.getElementById("cmd").value
+        var txn = new TextEncoder().encode(cmd.cmds[0].cmd);
         var signed = await window.ledger.signTransaction("m/44'/626'/0'",txn);
         var sig = signed.signature;
         document.getElementById("signature").value = sig;
-        console.log(sig);
      }
     
      function reset(){
