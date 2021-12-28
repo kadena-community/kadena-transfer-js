@@ -34,6 +34,8 @@
        };
 
         $.fn.form.settings.rules.validEntry = function(sig) {
+          if (window.ledger)
+            return true;
           if (sig.length === 128 || sig.length === 64) {
             return true;
           } else if (sig.length === 0){
@@ -314,6 +316,7 @@
         var signed = await window.ledger.signTransaction("m/44'/626'/0'",txn);
         var sig = signed.signature;
         document.getElementById("signature").value = sig;
+        document.getElementById('submit-button').classList.add("disabled");
      }
      
      async function getPublicKeyFromLedger(){
@@ -321,11 +324,12 @@
 
         var publicKey = (await window.ledger.getPublicKey("44'/626'/0'")).publicKey;
         document.getElementById("publicKey").value = [ publicKey ];
-        document.getElementById("getPubkey-content").innerText = publicKey;
+        document.getElementById("fromAccount").innerText = publicKey;
         let title = document.getElementById("getPubkey-button");
         let content = document.getElementById("getPubkey-content");
         title.classList.add('active')
         content.classList.add('active')
+        document.getElementById('submit-button').classList.remove("disabled");
      }
     
      function reset(){
@@ -881,6 +885,12 @@
                 </div>
               </div>
                 <div class="field">
+                  <div class="ui accordion">
+                    <div class="title" id="getPubkey-button">
+                      <i class="dropdown icon"></i>
+                      Show Ledger Public Key
+                    </div>
+                  </div>
                   <label>Sender</label>
                   <div class="ui right action left input">
                     <input type="text" id="fromAccount" placeholder="Enter Account Name of the sender">
@@ -1004,17 +1014,6 @@
                       Get Hash (Use with signature)
                     </div>
                     <div class="content" id="hash-content">
-                      <div class="ui message">
-                        <p style="font-weight:bold;" id="hash-string"></p>
-                      </div>
-                    </div>
-              </div>
-              <div class="ui accordion">
-                    <div class="title" id="getPubkey-button">
-                      <i class="dropdown icon"></i>
-                      Show Ledger Public Key
-                    </div>
-                    <div class="content" id="getPubkey-content">
                       <div class="ui message">
                         <p style="font-weight:bold;" id="hash-string"></p>
                       </div>
