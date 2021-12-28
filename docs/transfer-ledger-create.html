@@ -292,12 +292,17 @@
      function formIsValid(){
        return $('.form').form('is valid');
      }
-
-     async function signWithLedger(){
+     
+     async function getLedger(){
         if (!window.ledger) {
           var transp = await window.TranspWeb.create();
           window.ledger = new window.Kadena(transp);
         }
+     }
+     
+     async function signWithLedger(){
+        getLedger();
+        
         if (document.getElementById("getPubkey-content").innerText == "") {
           document.getElementById("publicKey").value = [ (await window.ledger.getPublicKey("44'/626'/0'")).publicKey ];
         } else {
@@ -312,10 +317,7 @@
      }
      
      async function getPublicKeyFromLedger(){
-        if (!window.ledger) {
-          var transp = await window.TranspWeb.create();
-          window.ledger = new window.Kadena(transp);
-        }
+        getLedger();
 
         var publicKey = (await window.ledger.getPublicKey("44'/626'/0'")).publicKey;
         document.getElementById("publicKey").value = [ publicKey ];
