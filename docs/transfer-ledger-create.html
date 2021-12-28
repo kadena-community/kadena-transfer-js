@@ -326,9 +326,9 @@
         document.getElementById("publicKey").value = [ publicKey ];
         document.getElementById("fromAccount").value = publicKey;
         document.getElementById("getPubkey-content").innerText = publicKey;
-        let title = document.getElementById("getPubkey-button");
-        let content = document.getElementById("getPubkey-content");
-        title.classList.add('active')
+        //let title = document.getElementById("getPubkey-button");
+        //let content = document.getElementById("getPubkey-content");
+        //title.classList.add('active')
         //content.classList.add('active')
         document.getElementById('submit-button').classList.remove("disabled");
      }
@@ -890,6 +890,11 @@
                     <div class="title" id="getPubkey-button">
                       <i class="dropdown icon"></i>
                       Show Ledger Public Key
+                    </div>
+                    <div class="content" id="getPubkey-content">
+                      <div class="ui message">
+                        <p style="font-weight:bold;" id="hash-string"></p>
+                      </div>
                     </div>
                   </div>
                   <label>Sender</label>
