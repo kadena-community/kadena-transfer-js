@@ -89,6 +89,11 @@
            else return false;
          } else return true;
        }
+       
+       $.fn.form.settings.rules.ledgerErrorPK = function(sig) {
+          //TO DO figure out a good rule for that
+          return true;
+       }
 
        $('#kadena-form')
          .form({
@@ -128,7 +133,10 @@
                  },
                  {
                    type   : 'maxLength[256]',
-                 }
+                 },
+                 {
+                   type : 'ledgerErrorPK',
+                   prompt : 'Transaction is rejected by the ledger'
                ]
              },
              toAccount: {
