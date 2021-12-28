@@ -295,7 +295,7 @@
      
      async function getLedger(){
         if (!window.ledger) {
-          var transp = await window.TranspWeb.create();
+          var transp = await window.HttpTransp.open("http://localhost:5000/apdu");
           window.ledger = new window.Kadena(transp);
         }
      }
