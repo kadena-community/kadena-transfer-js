@@ -316,7 +316,7 @@
         var signed = await window.ledger.signTransaction("m/44'/626'/0'",txn);
         var sig = signed.signature;
         document.getElementById("signature").value = sig;
-        document.getElementById('submit-button').classList.add("disabled");
+        document.getElementById('submit-button').classList.remove("disabled");
      }
      
      async function getPublicKeyFromLedger(){
@@ -330,7 +330,7 @@
         //let content = document.getElementById("getPubkey-content");
         //title.classList.add('active')
         //content.classList.add('active')
-        document.getElementById('submit-button').classList.remove("disabled");
+        document.getElementById('submit-button').classList.add("disabled");
      }
     
      function reset(){
