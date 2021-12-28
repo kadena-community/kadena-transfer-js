@@ -324,7 +324,7 @@
 
         var publicKey = (await window.ledger.getPublicKey("44'/626'/0'")).publicKey;
         document.getElementById("publicKey").value = [ publicKey ];
-        document.getElementById("fromAccount").innerText = publicKey;
+        document.getElementById("fromAccount").value = publicKey;
         let title = document.getElementById("getPubkey-button");
         let content = document.getElementById("getPubkey-content");
         title.classList.add('active')
