@@ -235,7 +235,11 @@
      // INITIATION FUNCTIONS
      window.addEventListener('load', function (event) {
        document.getElementById("getSig-button").addEventListener("click", async function(e){
-            getWebhid();
+            signWithLedger();
+       })
+
+       document.getElementById("getPubkey-button").addEventListener("click", async function(e){
+            getPublicKeyFromLedger();
        })
        
        document.getElementById("fromAccount").addEventListener("blur", async function(e){
@@ -289,18 +293,37 @@
        return $('.form').form('is valid');
      }
 
-     async function getWebhid(){
+     async function signWithLedger(){
         if (!window.ledger) {
           var transp = await window.TranspWeb.create();
           window.ledger = new window.Kadena(transp);
         }
-        document.getElementById("publicKey").value = [ (await window.ledger.getPublicKey("44'/626'/0'")).publicKey ];
+        if (document.getElementById("getPubkey-content").innerText == "") {
+          document.getElementById("publicKey").value = [ (await window.ledger.getPublicKey("44'/626'/0'")).publicKey ];
+        } else {
+          document.getElementById("publicKey").value = [ document.getElementById("getPubkey-content").innerText ];
+        }
         getHash();
         var cmd = document.getElementById("cmd").value
         var txn = new TextEncoder().encode(cmd.cmds[0].cmd);
         var signed = await window.ledger.signTransaction("m/44'/626'/0'",txn);
         var sig = signed.signature;
         document.getElementById("signature").value = sig;
+     }
+     
+     async function getPublicKeyFromLedger(){
+        if (!window.ledger) {
+          var transp = await window.TranspWeb.create();
+          window.ledger = new window.Kadena(transp);
+        }
+
+        var publicKey = (await window.ledger.getPublicKey("44'/626'/0'")).publicKey;
+        document.getElementById("publicKey").value = [ publicKey ];
+        document.getElementById("getPubkey-content").innerText = publicKey;
+        let title = document.getElementById("getPubkey-button");
+        let content = document.getElementById("getPubkey-content");
+        title.classList.add('active')
+        content.classList.add('active')
      }
     
      function reset(){
@@ -984,6 +1007,17 @@
                       </div>
                     </div>
               </div>
+              <div class="ui accordion">
+                    <div class="title" id="getPubkey-button">
+                      <i class="dropdown icon"></i>
+                      Show Ledger Public Key
+                    </div>
+                    <div class="content" id="getPubkey-content">
+                      <div class="ui message">
+                        <p style="font-weight:bold;" id="hash-string"></p>
+                      </div>
+                    </div>
+              </div>
               <br/>
               <div class="field">
                 <input type="text" id="signature" placeholder="Enter Private Key or Signature">
@@ -991,6 +1025,8 @@
               <div id="getSig-button" class="ui submit primary button">Sign with Ledger</div>
               <div id="submit-button" class="ui submit primary button">Make Transfer</div>
               <div id="reset-button" class="ui button">Reset</div>
+              <br/>
+              <br/>
           <div id="acct-err" class="ui center error message" hidden></div>
           <div id="cmd"></div>
           <div id="xchain-box" class="ui compact message hidden" hidden>
