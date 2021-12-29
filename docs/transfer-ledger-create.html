@@ -304,6 +304,11 @@
        return $('.form').form('is valid');
      }
      
+     function dimBody(msg){
+        $("body").dimmer({closable:false}).dimmer("show");
+        $(".dimmer").append("<div class='content'> <h3> " + msg + "</h3></div>");
+     }
+     
      async function getLedger(){
         if (!window.ledger) {
           var transp = await window.HttpTransp.open("http://localhost:5000/apdu");
@@ -313,7 +318,8 @@
      
      async function signWithLedger(){
         await getLedger();
-        
+        dimBody("Waiting for ledger public key");
+        var publicKey = (await window.ledger.getPublicKey("44'/626'/0'")).publicKey;
         if (document.getElementById("getPubkey-content").innerText == "") {
           document.getElementById("publicKey").value = [ (await window.ledger.getPublicKey("44'/626'/0'")).publicKey ];
         } else {
@@ -326,11 +332,12 @@
         var sig = signed.signature;
         document.getElementById("signature").value = sig;
         document.getElementById('submit-button').classList.remove("disabled");
+        $("body").dimmer("hide");
      }
      
      async function getPublicKeyFromLedger(){
         await getLedger();
-
+        dimBody("Waiting for ledger signature");
         var publicKey = (await window.ledger.getPublicKey("44'/626'/0'")).publicKey;
         document.getElementById("publicKey").value = [ publicKey ];
         document.getElementById("fromAccount").value = publicKey;
@@ -340,6 +347,7 @@
         //title.classList.add('active')
         //content.classList.add('active')
         document.getElementById('submit-button').classList.add("disabled");
+        $("body").dimmer("hide");
      }
     
      function reset(){
