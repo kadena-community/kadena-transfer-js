@@ -318,7 +318,7 @@
      
      async function signWithLedger(){
         await getLedger();
-        var publicKey = (await window.ledger.getPublicKey("44'/626'/0'")).publicKey;
+
         if (window.pubKey === "") {
           document.getElementById("publicKey").value = [ (await window.ledger.getPublicKey("44'/626'/0'")).publicKey ];
         } else {
