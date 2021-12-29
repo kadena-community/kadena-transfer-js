@@ -321,8 +321,9 @@
 
         if (window.pubKey === "") {
           document.getElementById("publicKey").value = [ (await window.ledger.getPublicKey("44'/626'/0'")).publicKey ];
+          document.getElementById("fromAccount").value = publicKey;
         } else {
-          document.getElementById("publicKey").value = [ document.getElementById("getPubkey-content").innerText ];
+          document.getElementById("publicKey").value = [ window.pubKey ];
         }
         getHash();
         var cmd = document.getElementById("cmd").value
