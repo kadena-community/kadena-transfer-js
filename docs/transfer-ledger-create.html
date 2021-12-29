@@ -133,10 +133,6 @@
                  },
                  {
                    type   : 'maxLength[256]',
-                 },
-                 {
-                   type : 'ledgerErrorPK',
-                   prompt : 'Transaction is rejected by the ledger'
                  }
                ]
              },
@@ -246,11 +242,15 @@
      // INITIATION FUNCTIONS
      window.addEventListener('load', function (event) {
        document.getElementById("getSig-button").addEventListener("click", async function(e){
-            signWithLedger();
+            dimBody("Waiting for ledger signature");
+            await signWithLedger();
+            $("body").dimmer("hide");
        })
 
        document.getElementById("getPubkey-button").addEventListener("click", async function(e){
-            getPublicKeyFromLedger();
+            dimBody("Waiting for ledger public key");
+            await getPublicKeyFromLedger();
+            $("body").dimmer("hide");
        })
        
        document.getElementById("fromAccount").addEventListener("blur", async function(e){
@@ -306,7 +306,7 @@
      
      function dimBody(msg){
         $("body").dimmer({closable:false}).dimmer("show");
-        $(".dimmer").append("<div class='content'> <h3> " + msg + "</h3></div>");
+        $(".dimmer").html("<div class='content'> <h3> " + msg + "</h3></div>");
      }
      
      async function getLedger(){
@@ -318,7 +318,6 @@
      
      async function signWithLedger(){
         await getLedger();
-        dimBody("Waiting for ledger public key");
         var publicKey = (await window.ledger.getPublicKey("44'/626'/0'")).publicKey;
         if (document.getElementById("getPubkey-content").innerText == "") {
           document.getElementById("publicKey").value = [ (await window.ledger.getPublicKey("44'/626'/0'")).publicKey ];
@@ -332,12 +331,10 @@
         var sig = signed.signature;
         document.getElementById("signature").value = sig;
         document.getElementById('submit-button').classList.remove("disabled");
-        $("body").dimmer("hide");
      }
      
      async function getPublicKeyFromLedger(){
         await getLedger();
-        dimBody("Waiting for ledger signature");
         var publicKey = (await window.ledger.getPublicKey("44'/626'/0'")).publicKey;
         document.getElementById("publicKey").value = [ publicKey ];
         document.getElementById("fromAccount").value = publicKey;
@@ -347,7 +344,6 @@
         //title.classList.add('active')
         //content.classList.add('active')
         document.getElementById('submit-button').classList.add("disabled");
-        $("body").dimmer("hide");
      }
     
      function reset(){
