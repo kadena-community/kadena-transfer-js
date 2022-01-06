@@ -211,7 +211,11 @@
         const networkId = document.getElementById("networkId").textContent
         const host = `https://${server}/chainweb/0.0/${networkId}/chain/${targetChainId}/pact`;
         const gasStation = "free-x-chain-gas";
-        const m = Pact.lang.mkMeta(gasStation, targetChainId, 0.00000001, 400, createTime(), 28800);
+        const gasLimit = 400;
+        const testnetGasPrice = 0.000000001;
+        const mainnetGasPrice = 0.00000001;
+        const gasPrice = networkId==="testnet04" ? testnetGasPrice : mainnetGasPrice;
+        const m = Pact.lang.mkMeta(gasStation, targetChainId, gasPrice, gasLimit, createTime(), 28800);
         const contCmd = {type: "cont", keyPairs:[],pactId: pactId, rollback: false, step: 1, meta: m, proof: proof, networkId: networkId}
         try {
          const result = await sendNonJson(contCmd, host);
