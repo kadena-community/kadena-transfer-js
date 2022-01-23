@@ -472,6 +472,19 @@
              let publicKey = res.result.data.guard.keys
              document.getElementById("publicKey").value = publicKey
              clearError();
+           } else if (("fun" in res.result.data.guard) && ("args" in res.result.data.guard)) {
+             // Adds support for a very specific format of time locked accounts
+             const guardFun = res.result.data.guard.fun;
+             const [ksRef,afterDateFun] = res.result.data.guard.args;
+             if ((guardFun === "util.guards.enforce-and") && ("keysetref" in ksRef) && (afterDateFun["fun"] === "util.guards.enforce-after-date" )) {
+               getKeysetRef(ksRef.keysetref, getNode(chainId).host).then(resKeyset => {
+               let publicKey = resKeyset.result.data.keys
+               document.getElementById("publicKey").value = publicKey
+               clearError();
+             });
+             } else {
+              setError("Account Guard of the sender is not conventional. Please use a different tool.")
+             }
            } else {
              setError("Account Guard of the sender is not conventional. Please use a different tool.")
            }
