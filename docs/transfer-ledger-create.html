@@ -90,11 +90,6 @@
          } else return true;
        }
        
-       $.fn.form.settings.rules.ledgerErrorPK = function(sig) {
-          //TO DO figure out a good rule for that
-          return true;
-       }
-
        $('#kadena-form')
          .form({
            on: 'blur',
@@ -305,7 +300,7 @@
      }
      
      function dimBody(msg){
-        $("body").dimmer({closable:false}).dimmer("show");
+        $("body").dimmer({closable:true}).dimmer("show");
         $(".dimmer").html("<div class='content'> <h3> " + msg + "</h3></div>");
      }
      
@@ -336,9 +331,10 @@
      
      async function getPublicKeyFromLedger(){
         await getLedger();
+        var prefix = "k:"
         var publicKey = (await window.ledger.getPublicKey("44'/626'/0'")).publicKey;
         document.getElementById("publicKey").value = [ publicKey ];
-        document.getElementById("fromAccount").value = publicKey;
+        document.getElementById("fromAccount").value = prefix.concat(publicKey);
         window.pubKey = publicKey;
         //let title = document.getElementById("getPubkey-button");
         //let content = document.getElementById("getPubkey-content");
@@ -910,7 +906,7 @@
                   <div class="ui accordion">
                     <div class="title" id="getPubkey-button">
                       <i class="dropdown icon"></i>
-                      Show Ledger Public Key
+                      Show Ledger Account Name
                     </div>
                     <div class="content" id="getPubkey-content">
                       <div class="ui message">
@@ -1035,18 +1031,12 @@
             </div>
               <div class="field">
                   <label>Sign</label>
-                  <div class="ui accordion">
                     <div class="title" id="sign-button">
-                      <i class="dropdown icon"></i>
-                      Get Hash (Use with signature)
                     </div>
                     <div class="content" id="hash-content">
-                      <div class="ui message">
                         <p style="font-weight:bold;" id="hash-string"></p>
-                      </div>
                     </div>
               </div>
-              <br/>
               <div class="field">
                 <input type="text" id="signature" placeholder="Enter Private Key or Signature">
               </div>
