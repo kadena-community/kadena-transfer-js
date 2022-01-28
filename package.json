@@ -4,26 +4,29 @@
   "description": "Simple Javascript tools to transfer Kadena coins",
   "main": "scripts",
   "scripts": {
+    "build-ledger": "cd packages/bundle; yarn; yarn build; cp dist/main.js ../../util/ledger-os.js",
     "transfer-online": "node ./scripts/transfer-online.js",
     "transfer-create-online": "node ./scripts/transfer-create-online.js",
     "transfer-offline": "node ./scripts/transfer-offline.js",
     "transfer-create-offline": "node ./scripts/transfer-create-offline.js",
     "cross-chain-transfer-offline": "node ./scripts/cross-chain-transfer-offline.js"
   },
-  "repository": {
-    "type": "git",
-    "url": "github.com/kadena-community/kadena-transfer-js"
-  },
+  "repository": "github.com/kadena-community/kadena-transfer-js",
   "author": "Hee Kyun Yun",
   "license": "UNLICENSED",
   "dependencies": {
+    "@ledgerhq/hw-transport-webhid": "^6.20.0",
     "base64-url": "^2.2.1",
     "blakejs": "^1.0.1",
     "browserify": "^16.2.3",
     "node-fetch": "^2.6.0",
     "pact-lang-api": "^3.2.0",
     "readline": "^1.3.0",
+    "tsify": "^5.0.4",
     "tweetnacl": "^0.14.5"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "lerna": "^4.0.0",
+    "live-server": "^1.2.1"
+  }
 }

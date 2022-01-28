@@ -1,0 +1,18 @@
+{
+  "name": "ledger-bundle",
+  "version": "0.0.0",
+  "description": "A bundler for ledger related hardware (Kadena)",
+  "main": "main.js",
+  "scripts": {
+    "build": "browserify main.js -p [ tsify --noImplicitAny ] > ../util/ledger-os.js"
+  },
+  "author": "Alexandre Garcia de Oliveira (Romefeller)",
+  "license": "ISC",
+  "dependencies": {
+    "@ledgerhq/hw-transport-node-speculos": "^6.20.0",
+    "@ledgerhq/hw-transport-webhid": "^6.20.0",
+    "@ledgerhq/hw-transport-webusb": "^6.20.0",
+    "hw-app-kda": "git+https://github.com/obsidiansystems/hw-app-kda.git",
+    "tsify": "^5.0.4"
+  }
+}
