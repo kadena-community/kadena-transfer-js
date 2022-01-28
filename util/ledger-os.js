@@ -4197,7 +4197,7 @@ var Common = /** @class */ (function () {
                     case 1:
                         response = _a.sent();
                         responseSize = response[0];
-                        publicKey = response.slice(1, responseSize);
+                        publicKey = response.slice(1, responseSize + 1);
                         res = {
                             publicKey: publicKey.toString("hex")
                         };
