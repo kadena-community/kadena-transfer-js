@@ -89,7 +89,7 @@
            else return false;
          } else return true;
        }
-       
+
        $('#kadena-form')
          .form({
            on: 'blur',
@@ -247,7 +247,7 @@
             await getPublicKeyFromLedger();
             $("body").dimmer("hide");
        })
-       
+
        document.getElementById("fromAccount").addEventListener("blur", async function(e){
          fetchSenderKeyset();
        })
@@ -298,19 +298,19 @@
      function formIsValid(){
        return $('.form').form('is valid');
      }
-     
+
      function dimBody(msg){
         $("body").dimmer({closable:true}).dimmer("show");
         $(".dimmer").html("<div class='content'> <h3> " + msg + "</h3></div>");
      }
-     
+
      async function getLedger(){
         if (!window.ledger) {
           var transp = await window.TranspWeb.create();
             window.ledger = new window.Kadena(transp);
         }
      }
-     
+
      async function signWithLedger(){
         await getLedger();
 
@@ -328,7 +328,7 @@
         document.getElementById("signature").value = sig;
         document.getElementById('submit-button').classList.remove("disabled");
      }
-     
+
      async function getPublicKeyFromLedger(){
         await getLedger();
         var prefix = "k:"
@@ -342,7 +342,7 @@
         //content.classList.add('active')
         document.getElementById('submit-button').classList.add("disabled");
      }
-    
+
      function reset(){
        clearError()
        $('.form').form('reset');
@@ -402,7 +402,7 @@
          setTimeout(resolve, ms);
        });
      }
-     
+
      async function submit() {
        clearError();
        let cmd = document.getElementById("cmd").value
@@ -704,7 +704,7 @@
   function crossTransfer(sender, receiver, receiverKp, srcChain, targetChain, amount, fromPub, fromPriv){
     const m = Pact.lang.mkMeta(sender, srcChain, 0.00001, 600, createTime(), 28800);
     const kp = fromPub.map(pub => {
-      return {publicKey: pub, secretKey: fromPriv}
+      return {publicKey: pub, secretKey: fromPriv, clist: [{name: "coin.GAS", args: []}, {name: "coin.TRANSFER_XCHAIN", args: [sender, receiver, {"decimal": amount}, targetChain]}]}
     })
     let pactCode = `(coin.transfer-crosschain ${JSON.stringify(sender)} ${JSON.stringify(receiver)} (read-keyset "ks") ${JSON.stringify(targetChain)} ${convertDecimal(amount)})`;
     if (!validateKeyset(receiverKp) && receiverKp.keysetref){
