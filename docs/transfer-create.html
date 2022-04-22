@@ -655,7 +655,7 @@
   function crossTransfer(sender, receiver, receiverKp, srcChain, targetChain, amount, fromPub, fromPriv){
     const m = Pact.lang.mkMeta(sender, srcChain, 0.00001, 600, createTime(), 28800);
     const kp = fromPub.map(pub => {
-      return {publicKey: pub, secretKey: fromPriv}
+      return {publicKey: pub, secretKey: fromPriv, clist: [{name: "coin.GAS", args: []}, {name: "coin.TRANSFER_XCHAIN", args: [sender, receiver, {"decimal": amount}, targetChain]}]}
     })
     let pactCode = `(coin.transfer-crosschain ${JSON.stringify(sender)} ${JSON.stringify(receiver)} (read-keyset "ks") ${JSON.stringify(targetChain)} ${convertDecimal(amount)})`;
     if (!validateKeyset(receiverKp) && receiverKp.keysetref){
