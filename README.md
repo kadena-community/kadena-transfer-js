@@ -1,14 +1,15 @@
 # kadena-transfer-js
 
-Visit [Kadena Transfer Tool](https://transfer.chainweb.com/) for simple transfers of KDA. To easily integerate an exchange backend to Kadena's blockchain ecosystem, please visit [here](https://github.com/kadena-io/kda-exchange-integration).
+Kadena Transfer Tool supports simple KDA coin transfers. The frontend is deployed [here](https://transfer.chainweb.com/)
+To integerate an exchange backend to Kadena's blockchain ecosystem, please visit [kda-exchange-integration repo](https://github.com/kadena-io/kda-exchange-integration).
 
 ## Single Chain Transfer
 
-There are two ways to transfer KDA on a single chain.
+There are two ways to transfer KDA on a single chain. Kadena Transfer Tool uses `transfer-create` by default.
   1. `transfer`
   2. `transfer-create`
 
-Kadena Transfer Tool uses `transfer-create` by default. You can learn more about KDA coin contract [here](https://github.com/kadena-io/chainweb-node/blob/master/pact/coin-contract/coin.pact).
+You can learn more about KDA coin contract [here](https://github.com/kadena-io/chainweb-node/blob/master/pact/coin-contract/coin.pact).
 
 ### transfer-create
 
@@ -67,7 +68,7 @@ Cross chain transfer is a more complex transaction than single chain transfer, i
    - gas payer of the target chain
    - a signature of gas payer on the target chain.
 
-### Update ledger-os.js (Bundled dependencies)
+## Update ledger-os.js (Bundled dependencies)
 
  Sometimes all ledger dependencies gets updates in their repos so we need
  to get the file ledger-os.js updated as well.
