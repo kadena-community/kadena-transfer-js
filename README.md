@@ -1,17 +1,14 @@
 # kadena-transfer-js
 
-## Setup
-
-- Install Node.js
+Visit [Kadena Transfer Tool](https://transfer.chainweb.com/) for simple transfers of KDA. To easily integerate an exchange backend to Kadena's blockchain ecosystem, please visit [here](https://github.com/kadena-io/kda-exchange-integration).
 
 ## Single Chain Transfer
 
-There are two ways to transfer KDA in Chainweb on a single chain.
+There are two ways to transfer KDA on a single chain.
   1. `transfer`
   2. `transfer-create`
 
-
-You can learn more about KDA coin contract [here](https://github.com/kadena-io/chainweb-node/blob/master/pact/coin-contract/coin.pact).
+Kadena Transfer Tool uses `transfer-create` by default. You can learn more about KDA coin contract [here](https://github.com/kadena-io/chainweb-node/blob/master/pact/coin-contract/coin.pact).
 
 ### transfer-create
 
