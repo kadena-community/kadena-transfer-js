@@ -31,20 +31,6 @@ You should use this function if you are creating a new account and transferring 
 If you already have the receiver account, this function is still useful if you know the guard of the receiver account.
 This will be a more conservative approach than `coin.transfer` which prevents you from transferring to a wrong account by checking the receiver guard.
 
-If you want to create the command completely offline, use:
-```
-node scripts/transfer-create-offline.js
-```
-Here's an example screenshot of script.  
-![](img/transfer-create-offline.png)
-
-If you want to create the command with account validations and guard checks, use:
-```
-node scripts/transfer-create-online.js
-```
-Here's an example screenshot of script.  
-![](img/transfer-create-online.png)
-
 ### transfer
 
 **transfer** is executed between:
@@ -58,15 +44,6 @@ The function takes in the following arguments:
 and requires a signature of the sender keypair.
 
 You should use this function ONLY IF you are completely sure about the receiver account.
-
-If you want to create the command completely offline, use:
-```
-node scripts/transfer-offline.js
-```
-If you want to create the command with account validations and guard checks, use:
-```
-node scripts/transfer-online.js
-```
 
 ## Cross Chain Transfer
 
@@ -93,23 +70,18 @@ Cross chain transfer is a more complex transaction than single chain transfer, i
    - gas payer of the target chain
    - a signature of gas payer on the target chain.
 
-   If you want to create the command completely offline, use:
-   ```
-   node scripts/cross-chain-transfer-offline.js
-   ```
-
 ### Update ledger-os.js (Bundled dependencies)
 
  Sometimes all ledger dependencies gets updates in their repos so we need
- to get the file ledger-os.js updated as well. 
+ to get the file ledger-os.js updated as well.
 
  To do this we need follow those steps:
  - install browserify globally
- - cd ledger-bundle 
+ - cd ledger-bundle
  - npm run-script build
- 
+
  The desired file should appear on the util folder.
- 
+
 ## Docker
 
 ```
