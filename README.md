@@ -1,7 +1,8 @@
 # kadena-transfer-js
 
-Kadena Transfer Tool supports simple KDA coin transfers. The frontend is deployed [here](https://transfer.chainweb.com/)
-To integerate an exchange backend to Kadena's blockchain ecosystem, please visit [kda-exchange-integration repo](https://github.com/kadena-io/kda-exchange-integration).
+Kadena Transfer Tool supports simple KDA coin transfers. The frontend is deployed here: https://transfer.chainweb.com/
+
+To integerate an exchange backend to Kadena's blockchain ecosystem, please visit kda-exchange-integration repo: https://github.com/kadena-io/kda-exchange-integration
 
 ## Single Chain Transfer
 
