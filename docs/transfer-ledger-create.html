@@ -241,6 +241,11 @@
             await signWithLedger();
             $("body").dimmer("hide");
        })
+       document.getElementById("getBlindSig-button").addEventListener("click", async function(e){
+            dimBody("Waiting for ledger signature");
+            await signHashWithLedger();
+            $("body").dimmer("hide");
+       })
 
        document.getElementById("getPubkey-button").addEventListener("click", async function(e){
             dimBody("Waiting for ledger public key");
@@ -293,6 +298,11 @@
        reset();
      })
 
+     document.getElementById("showBlindSigning-button").addEventListener("click", async function(e){
+        document.getElementById("showBlindSigning-button").hidden = true;
+        document.getElementById("kadena-blind-sign-form-top").hidden = false;
+     })
+
      });
 
      function formIsValid(){
@@ -327,6 +337,24 @@
         var sig = signed.signature;
         document.getElementById("signature").value = sig;
         document.getElementById('submit-button').classList.remove("disabled");
+     }
+
+     async function signHashWithLedger(){
+        document.getElementById("blind-sig-err").hidden=true;
+        document.getElementById("blind-sig-err").innerText = "";
+        await getLedger();
+
+        var txnHash = document.getElementById("blind-signing-hash").value
+        try {
+          var signed = await window.ledger.signHash("m/44'/626'/0'",txnHash);
+          var sig = signed.signature;
+          document.getElementById("signature-blind-sig").value = sig;
+          document.getElementById("signature-blind-sig-field").hidden = false;
+        } catch (e) {
+          document.getElementById("kadena-blind-sign-form").classList.add("error")
+          document.getElementById("blind-sig-err").hidden=false;
+          document.getElementById("blind-sig-err").innerText = "An error occurred while trying to do blind signing. Please make sure the 'Blind Signing' feature is enabled on the Kadena Ledger App";
+        }
      }
 
      async function getPublicKeyFromLedger(){
@@ -1061,6 +1089,34 @@
           </div>
         </form>
 
+        <div class="title" id="showBlindSigning-button">
+          <i class="dropdown icon"></i>
+          Transaction hash signing (Blind Signing)
+        </div>
+        <div id="kadena-blind-sign-form-top" hidden>
+          <div id="kadena-warning" class="ui warning message">
+            <i class="close icon"></i>
+              <div class="header">
+                 Warning
+              </div>
+              <p>
+              Transaction hash signing (Blind Signing) feature is intended only for advanced users.
+              Please ensure that the 'Blind Signing' is enabled on the Kadena Ledger App.
+              </p>
+          </div>
+          <form id ="kadena-blind-sign-form" class="ui form" autocomplete="off">
+            <div class="field">
+              <label>Transaction Hash</label>
+              <input type="text" id="blind-signing-hash" placeholder="Enter Transaction Hash">
+            </div>
+            <div id="getBlindSig-button" class="ui primary button">Sign Transaction Hash with Ledger</div>
+            <div id="blind-sig-err" class="ui center error message" hidden></div>
+            <div class="field" id="signature-blind-sig-field" hidden>
+              <label>Signature</label>
+              <input type="text" id="signature-blind-sig" placeholder="">
+            </div>
+          </form>
+        </div>
     </div>
 </body>
 <style>
@@ -1070,6 +1126,11 @@
   }
 
   #kadena-form {
+    margin: auto;
+    text-align: center;
+    width: 400px;
+  }
+  #kadena-blind-sign-form {
     margin: auto;
     text-align: center;
     width: 400px;
