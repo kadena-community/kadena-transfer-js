@@ -334,10 +334,14 @@
         getHash();
         var cmd = document.getElementById("cmd").value
         var txn = new TextEncoder().encode(cmd.cmds[0].cmd);
-        var signed = await window.ledger.signTransaction(DEFAULT_BIP32_PATH,txn);
-        var sig = signed.signature;
-        document.getElementById("signature").value = sig;
-        document.getElementById('submit-button').classList.remove("disabled");
+        try {
+          var signed = await window.ledger.signTransaction(DEFAULT_BIP32_PATH,txn);
+          var sig = signed.signature;
+          document.getElementById("signature").value = sig;
+          document.getElementById('submit-button').classList.remove("disabled");
+        } catch (e) {
+          setError("Could not obtain the signature")
+        }
      }
 
      async function signHashWithLedger(){
@@ -361,15 +365,19 @@
      async function getPublicKeyFromLedger(){
         await getLedger();
         var prefix = "k:"
-        var publicKey = (await window.ledger.getPublicKey(DEFAULT_BIP32_PATH)).publicKey;
-        document.getElementById("publicKey").value = [ publicKey ];
-        document.getElementById("fromAccount").value = prefix.concat(publicKey);
-        window.pubKey = publicKey;
-        //let title = document.getElementById("getPubkey-button");
-        //let content = document.getElementById("getPubkey-content");
-        //title.classList.add('active')
-        //content.classList.add('active')
-        document.getElementById('submit-button').classList.add("disabled");
+        try {
+          var publicKey = (await window.ledger.getPublicKey(DEFAULT_BIP32_PATH)).publicKey;
+          document.getElementById("publicKey").value = [ publicKey ];
+          document.getElementById("fromAccount").value = prefix.concat(publicKey);
+          window.pubKey = publicKey;
+          //let title = document.getElementById("getPubkey-button");
+          //let content = document.getElementById("getPubkey-content");
+          //title.classList.add('active')
+          //content.classList.add('active')
+          document.getElementById('submit-button').classList.add("disabled");
+        } catch (e) {
+          setError("Could not get the Ledger Account Name")
+        }
      }
 
      function reset(){
