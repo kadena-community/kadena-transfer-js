@@ -321,11 +321,12 @@
         }
      }
 
+     const DEFAULT_BIP32_PATH = "m/44'/626'/0'/0/0";
      async function signWithLedger(){
         await getLedger();
 
         if (window.pubKey === "") {
-          document.getElementById("publicKey").value = [ (await window.ledger.getPublicKey("44'/626'/0'")).publicKey ];
+          document.getElementById("publicKey").value = [ (await window.ledger.getPublicKey(DEFAULT_BIP32_PATH)).publicKey ];
           document.getElementById("fromAccount").value = publicKey;
         } else {
           document.getElementById("publicKey").value = [ window.pubKey ];
@@ -333,7 +334,7 @@
         getHash();
         var cmd = document.getElementById("cmd").value
         var txn = new TextEncoder().encode(cmd.cmds[0].cmd);
-        var signed = await window.ledger.signTransaction("m/44'/626'/0'",txn);
+        var signed = await window.ledger.signTransaction(DEFAULT_BIP32_PATH,txn);
         var sig = signed.signature;
         document.getElementById("signature").value = sig;
         document.getElementById('submit-button').classList.remove("disabled");
@@ -346,7 +347,7 @@
 
         var txnHash = document.getElementById("blind-signing-hash").value
         try {
-          var signed = await window.ledger.signHash("m/44'/626'/0'",txnHash);
+          var signed = await window.ledger.signHash(DEFAULT_BIP32_PATH,txnHash);
           var sig = signed.signature;
           document.getElementById("signature-blind-sig").value = sig;
           document.getElementById("signature-blind-sig-field").hidden = false;
@@ -360,7 +361,7 @@
      async function getPublicKeyFromLedger(){
         await getLedger();
         var prefix = "k:"
-        var publicKey = (await window.ledger.getPublicKey("44'/626'/0'")).publicKey;
+        var publicKey = (await window.ledger.getPublicKey(DEFAULT_BIP32_PATH)).publicKey;
         document.getElementById("publicKey").value = [ publicKey ];
         document.getElementById("fromAccount").value = prefix.concat(publicKey);
         window.pubKey = publicKey;
