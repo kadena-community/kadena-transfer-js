@@ -279,6 +279,13 @@
 
      });
 
+     const localGasLimit = 1000
+     const transferGasLimit = 2300;
+     const xChainInitiateGasLimit = 1800;
+     const xChainFinishGasLimit = 750;
+     const xChainFinishGasPrice = 0.00000001;
+     const gasPrice = 0.00001;
+
      function formIsValid(){
        return $('.form').form('is valid');
      }
@@ -397,7 +404,7 @@
                      proof = await res.json();
                    }
                  }
-                 const m = Pact.lang.mkMeta("kadena-xchain-gas", targetChainId, 0.00000001, 400, createTime(), 28800);
+                 const m = Pact.lang.mkMeta("kadena-xchain-gas", targetChainId, xChainFinishGasPrice, xChainFinishGasLimit, createTime(), 28800);
                  const contCmd = {type: "cont", keyPairs:[],pactId: pactId, rollback: false, step: 1, meta: m, proof: proof, networkId: networkId}
                  const cmd = Pact.simple.cont.createCommand( contCmd.keyPairs, contCmd.nonce, contCmd.step, contCmd.pactId,
                                                           contCmd.rollback, contCmd.envData, contCmd.meta, contCmd.proof, contCmd.networkId);
@@ -604,7 +611,7 @@
    async function getAccountDetails(account, node){
      if (account.length>=3){
        try {
-         const m = Pact.lang.mkMeta("", "", 0.00001, 600, createTime(), 28800);
+         const m = Pact.lang.mkMeta("", "", gasPrice, localGasLimit, createTime(), 28800);
          const tx = await Pact.fetch.local({
            pactCode: `(coin.details ${JSON.stringify(account)})`,
            meta: m
@@ -620,7 +627,7 @@
 
     async function getKeysetRef(keyset, node){
       try {
-        const m = Pact.lang.mkMeta("", "", 0.00001, 600, createTime(), 28800);
+        const m = Pact.lang.mkMeta("", "", gasPrice, localGasLimit, createTime(), 28800);
         const tx = await Pact.fetch.local({
           pactCode: `(describe-keyset ${JSON.stringify(keyset)})`,
           meta: m
@@ -653,7 +660,7 @@
    }
 
   function crossTransfer(sender, receiver, receiverKp, srcChain, targetChain, amount, fromPub, fromPriv){
-    const m = Pact.lang.mkMeta(sender, srcChain, 0.00001, 600, createTime(), 28800);
+    const m = Pact.lang.mkMeta(sender, srcChain, gasPrice, xChainInitiateGasLimit, createTime(), 28800);
     const kp = fromPub.map(pub => {
       return {publicKey: pub, secretKey: fromPriv, clist: [{name: "coin.GAS", args: []}, {name: "coin.TRANSFER_XCHAIN", args: [sender, receiver, {"decimal": amount}, targetChain]}]}
     })
@@ -673,7 +680,7 @@
   }
 
   function transferCreate(sender, receiver, receiverKp, fromPub, fromPriv, chainId, amount){
-    const m = Pact.lang.mkMeta(sender, chainId, 0.00001, 600, createTime(), 28800);
+    const m = Pact.lang.mkMeta(sender, chainId, gasPrice, transferGasLimit, createTime(), 28800);
     const kp = fromPub.map(pub => {
       return {publicKey: pub, secretKey: fromPriv, clist: [{name: "coin.GAS", args: []}, {name: "coin.TRANSFER", args: [sender, receiver, Number(amount)]}]}
     })
