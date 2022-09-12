@@ -66,6 +66,7 @@
             <div class="field">
               <label>Gas payer account</label>
               <input type="text" id="gas-payer" placeholder="kadena-xchain-gas" value="kadena-xchain-gas">
+              <!-- <button id="verify-gas-payer" class="ui primary button">Verify</button> -->
             </div>
 
             <div class="field">
@@ -74,10 +75,16 @@
             </div>
 
             <div class="field">
-              <label>Gas amount</label>
-              <input type="text" id="gas-amount" placeholder="750" value="750">
+              <label>Gas limit</label>
+              <input type="text" id="gas-limit" placeholder="750" value="750">
             </div>
 
+            <div id="sig-data-message" class="ui message hidden">
+              <div class="header">SigData</div>
+              <textarea name="SigData" id="sig-data" cols="30" rows="10" disabled="disabled">
+              </textarea>
+              <button id="click-to-copy" class="ui secondary basic button">Click To Copy</button>
+            </div>
           </div>
 
           <div id="submit-block">
@@ -181,6 +188,14 @@
 
   #listen-button {
     margin-top: 10px;
+  }
+
+  .td-underline {
+    text-decoration: underline;
+  }
+
+  .td-no {
+    text-decoration: none;
   }
 </style>
 
