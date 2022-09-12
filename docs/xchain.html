@@ -16,6 +16,7 @@
       <img
         src="https://explorer.chainweb.com/static/1lv9xhxyhlqc262kffl55w08ms1cvxsnrv49zhvm0b799dsi0v0i-kadena-k-logo.png"
         class="center" style="height:70px">
+
       <h1>Finish Cross Chain Transfer</h1>
       <form id="kadena-form" class="ui form">
         <div class="field">
@@ -61,6 +62,49 @@
 
       </div>
 
+          <div id="gas-payer-form" class="ui form">
+            <div class="field">
+              <label>Gas payer account</label>
+              <input type="text" id="gas-payer" placeholder="kadena-xchain-gas" value="kadena-xchain-gas">
+            </div>
+
+            <div class="field">
+              <label>Gas price</label>
+              <input type="text" id="gas-price" placeholder="0.00000001" value="0.00000001">
+            </div>
+
+            <div class="field">
+              <label>Gas amount</label>
+              <input type="text" id="gas-amount" placeholder="750" value="750">
+            </div>
+
+          </div>
+
+          <div id="submit-block">
+            <button id="submit-button" class="ui primary button" disabled>Finish Cross Chain Transfer</button>
+          </div>
+
+          <div id="acct-err" class="ui center error message"></div>
+
+          <div id="result-message" class="ui compact message hidden"></div>
+        </div>
+      </form>
+
+      <div id="status-box" class="ui compact message result hidden">
+        <div id="reqkey-box">
+          <div class="header"> Request Key </div>
+          <p id="request-key" />
+        </div>
+
+        <br />
+        <div>
+          <div class="header" id="status-message"></div>
+          <p id="status-error">
+            <button id="listen-button" class="ui button" disabled>Listen Again</button>
+        </div>
+
+      </div>
+
     </div>
 </body>
 <style>
@@ -79,6 +123,10 @@
 
   .check-button {
     margin-top: 15px;
+  }
+
+  #gas-payer-form input[type=text] {
+    width: 300px;
   }
 
   .ui #server-field {
