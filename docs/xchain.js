@@ -270,9 +270,6 @@ class State {
   static set targetChainId(value) {
     document.getElementById('target-chain-id').textContent = value;
   }
-  static get sender() {
-    return document.getElementById('sender').textContent;
-  }
 
   /**
    * example: sender
@@ -280,6 +277,13 @@ class State {
   static set sender(value) {
     document.getElementById('sender').textContent = value;
   }
+  static get sender() {
+    return document.getElementById('sender').textContent;
+  }
+  static get senderPublicKey() {
+    return State.sender.split(':')[1]
+  }
+
   static get receiver() {
     return document.getElementById('receiver').textContent;
   }
@@ -742,7 +746,12 @@ async function fillSigData() {
   );
 
   c = Pact.simple.cont.createCommand(
-    [{ publicKey: State.sender.split(':')[1] }],
+    [
+      {
+        publicKey: State.senderPublicKey,
+        clist: [{ name: 'coin.GAS', args: [] }],
+      },
+    ],
     `transfer.chainweb ${State.requestKey} ${new Date().toLocaleString()}`,
     1,
     pactId,
@@ -754,7 +763,7 @@ async function fillSigData() {
   ).cmds[0];
 
   c.sigs = {
-    [State.sender]: null,
+    [State.senderPublicKey]: null,
   };
 
   setTimeout(
@@ -777,15 +786,17 @@ function isBalanceSufficient(gasPrice, gasLimit, res) {
 
 function isSingleSig(res) {
   try {
-    return (
-      res.result.data.guard.filter(g => g.keys && g.keys.length > 1).length > 0
-    );
-  } catch (_) {
-    try {
+    if (Array.isArray(res.result.data.guard)) {
+      return (
+        res.result.data.guard.filter(g => g.keys && g.keys.length > 1).length >
+        0
+      );
+    } else {
       return res.result.data.guard.keys.length === 1;
-    } catch (e) {
-      return false;
     }
+  } catch (e) {
+    console.error(e);
+    return false;
   }
 }
 
