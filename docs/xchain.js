@@ -498,11 +498,13 @@ function hideSpinner() {
 
 function clearError() {
   document.getElementById('acct-err').innerText = '';
+  document.getElementById('acct-err').classList.add('hidden');
   document.getElementById('kadena-form').setAttribute('class', 'ui form');
 }
 
 function setError(msg) {
   document.getElementById('acct-err').innerText = msg;
+  document.getElementById('acct-err').classList.remove('hidden');
   document.getElementById('kadena-form').setAttribute('class', 'ui form error');
 }
 
@@ -776,11 +778,14 @@ function isBalanceSufficient(gasPrice, gasLimit, res) {
 function isSingleSig(res) {
   try {
     return (
-      res.result.data.guard.filter(g => g.keys && g.keys.length === 1).length >
-      0
+      res.result.data.guard.filter(g => g.keys && g.keys.length > 1).length > 0
     );
-  } catch (e) {
-    return false;
+  } catch (_) {
+    try {
+      return res.result.data.guard.keys.length === 1;
+    } catch (e) {
+      return false;
+    }
   }
 }
 
