@@ -16,128 +16,125 @@
   </head>
 
   <body>
-    <div id="main">
-      <div class="ui container">
-        <img
-          alt="kadena-logo"
-          src="https://explorer.chainweb.com/static/1lv9xhxyhlqc262kffl55w08ms1cvxsnrv49zhvm0b799dsi0v0i-kadena-k-logo.png"
-          class="center"
-          style="height: 70px"
-        />
+    <div class="ui main container">
+      <img
+        alt="kadena-logo"
+        src="https://explorer.chainweb.com/static/1lv9xhxyhlqc262kffl55w08ms1cvxsnrv49zhvm0b799dsi0v0i-kadena-k-logo.png"
+        class="center"
+        style="height: 70px"
+      />
 
-        <h1>Finish Cross Chain Transfer</h1>
-        <form id="kadena-form" class="ui form">
+      <h1>Finish Cross Chain Transfer</h1>
+      <form id="kadena-form" class="ui form">
+        <div class="field">
+          <label>Chainweb Server</label>
+          <div id="server-field" class="ui right labeled input">
+            <input
+              type="text"
+              id="server"
+              placeholder="Enter Your Node Server"
+            />
+            <label class="ui label" id="networkId"></label>
+          </div>
+        </div>
+        <div class="field">
+          <label>Request Key</label>
+          <input type="text" id="pact-id" placeholder="Enter Request Key" />
+        </div>
+        <div id="pact-message" class="ui compact message hidden">
+          <div class="header" id="pact-header"></div>
+          <ul id="pact-info">
+            <p>Source Chain: <span id="source-chain-id" /></p>
+            <p>Target Chain: <span id="target-chain-id" /></p>
+            <p>Sender: <span id="sender" /></p>
+            <p>Receiver: <span id="receiver" /></p>
+            <p>Receiver Guard: <span id="rg" /></p>
+            <p>Amount: <span id="amount" /></p>
+          </ul>
+        </div>
+
+        <div id="gas-payer-form" class="ui form">
           <div class="field">
-            <label>Chainweb Server</label>
-            <div id="server-field" class="ui right labeled input">
-              <input
-                type="text"
-                id="server"
-                placeholder="Enter Your Node Server"
-              />
-              <label class="ui label" id="networkId"></label>
-            </div>
+            <label>Gas payer account</label>
+            <input
+              type="text"
+              id="gas-payer"
+              placeholder="kadena-xchain-gas"
+              value="kadena-xchain-gas"
+            />
+            <!-- <button id="verify-gas-payer" class="ui primary button">Verify</button> -->
           </div>
+
           <div class="field">
-            <label>Request Key</label>
-            <input type="text" id="pact-id" placeholder="Enter Request Key" />
-          </div>
-          <div id="pact-message" class="ui compact message hidden">
-            <div class="header" id="pact-header"></div>
-            <ul id="pact-info">
-              <p>Source Chain: <span id="source-chain-id" /></p>
-              <p>Target Chain: <span id="target-chain-id" /></p>
-              <p>Sender: <span id="sender" /></p>
-              <p>Receiver: <span id="receiver" /></p>
-              <p>Receiver Guard: <span id="rg" /></p>
-              <p>Amount: <span id="amount" /></p>
-            </ul>
+            <label>Gas price</label>
+            <input
+              type="text"
+              id="gas-price"
+              placeholder="0.00000001"
+              value="0.00000001"
+            />
           </div>
 
-          <div id="gas-payer-form" class="ui form">
-            <div class="field">
-              <label>Gas payer account</label>
-              <input
-                type="text"
-                id="gas-payer"
-                placeholder="kadena-xchain-gas"
-                value="kadena-xchain-gas"
-              />
-              <!-- <button id="verify-gas-payer" class="ui primary button">Verify</button> -->
-            </div>
-
-            <div class="field">
-              <label>Gas price</label>
-              <input
-                type="text"
-                id="gas-price"
-                placeholder="0.00000001"
-                value="0.00000001"
-              />
-            </div>
-
-            <div class="field">
-              <label>Gas limit</label>
-              <input type="text" id="gas-limit" placeholder="750" value="750" />
-            </div>
-
-            <div id="sig-data-message" class="ui message hidden">
-              <h3 class="header">SigData</h3>
-              <span
-                >Copy the output into a SigBuilder (in e.g. Chainweaver)</span
-              >
-              <textarea
-                name="SigData"
-                id="sig-data"
-                cols="30"
-                rows="10"
-                value=""
-                disabled="disabled"
-              ></textarea>
-              <button id="click-to-copy" class="ui secondary basic button">
-                Click To Copy
-              </button>
-            </div>
-
-            <div id="signed-transaction-wrapper" class="ui hidden">
-              <h3 class="header">Signed Transaction</h3>
-              <span>Paste the signed transaction</span>
-              <textarea
-                name="SigData"
-                id="signed-transaction"
-                cols="30"
-                rows="10"
-              >
-              </textarea>
-            </div>
+          <div class="field">
+            <label>Gas limit</label>
+            <input type="text" id="gas-limit" placeholder="750" value="750" />
           </div>
 
-          <div id="submit-block">
-            <button id="submit-button" class="ui primary button" disabled>
-              Finish Cross Chain Transfer
+          <div id="sig-data-message" class="ui compact message hidden">
+            <h3 class="header">SigData</h3>
+            <span>Copy the output into a SigBuilder (e.g. Chainweaver)</span>
+            <textarea
+              name="SigData"
+              id="sig-data"
+              cols="30"
+              rows="10"
+              value=""
+              disabled="disabled"
+            ></textarea>
+            <div class="field"></div>
+            <button id="click-to-copy" class="ui secondary basic button">
+              Click To Copy
             </button>
           </div>
 
-          <div id="acct-err" class="ui center error message hidden"></div>
-
-          <div id="result-message" class="ui compact message hidden"></div>
-        </form>
-
-        <div id="status-box" class="ui compact message result hidden">
-          <div id="reqkey-box">
-            <div class="header">Request Key</div>
-            <p id="request-key" />
+          <div id="signed-transaction-wrapper" class="ui field hidden">
+            <label class="">Signed Transaction</label>
+            <div>Paste the signed transaction below</div>
+            <textarea
+              name="SigData"
+              id="signed-transaction"
+              cols="30"
+              rows="10"
+            >
+            </textarea>
           </div>
+        </div>
 
-          <br />
-          <div>
-            <div class="header" id="status-message"></div>
-            <p id="status-error">
-              <button id="listen-button" class="ui button" disabled>
-                Listen Again
-              </button>
-            </p>
-          </div>
+        <div id="submit-block">
+          <button id="submit-button" class="ui primary button" disabled>
+            Finish Cross Chain Transfer
+          </button>
+        </div>
+
+        <div id="acct-err" class="ui center error message hidden"></div>
+
+        <div id="result-message" class="ui compact message hidden"></div>
+      </form>
+
+      <div id="status-box" class="ui compact message result hidden">
+        <div id="reqkey-box">
+          <div class="header">Request Key</div>
+          <p id="request-key" />
+        </div>
+
+        <br />
+        <div>
+          <div class="header" id="status-message"></div>
+          <p id="status-error">
+            <button id="listen-button" class="ui button" disabled>
+              Listen Again
+            </button>
+          </p>
         </div>
       </div>
     </div>
@@ -228,6 +225,12 @@
 
     .td-no {
       text-decoration: none;
+    }
+    textarea {
+      max-width: 700px;
+    }
+    body > div {
+      padding: 40px 40px;
     }
   </style>
 </html>

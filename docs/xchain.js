@@ -209,18 +209,18 @@ class State {
   }
 
   static set requestKey(value) {
-    window.localStorage.setItem('xchain-requestKey', value);
+    window.localStorage.setItem('xchain-request-key', value);
     document.getElementById('pact-id').value = value;
   }
 
   static get requestKey() {
-    const ls = getIfSetLocalStorage('xchain-requestKey');
+    const ls = getIfSetLocalStorage('xchain-request-key');
     if (ls) {
       return ls;
     }
 
     const requestKey = document.getElementById('pact-id').value.trim();
-    window.localStorage.setItem('xchain-requestKey', requestKey);
+    window.localStorage.setItem('xchain-request-key', requestKey);
     return requestKey;
   }
 
@@ -315,11 +315,14 @@ class State {
     document.getElementById('amount').textContent = value;
   }
 
+  /**
+   * example: k:someaccount
+   * example: kadena-xchain-gas
+   */
   static set gasPayer(value) {
     localStorage.setItem('xchain-gas-payer', value);
     document.getElementById('gas-payer').value = value;
   }
-
   static get gasPayer() {
     const ls = getIfSetLocalStorage('xchain-gas-payer');
     if (ls) {
@@ -369,11 +372,11 @@ var getProof = async function () {
 };
 
 const handleResult = async function (res) {
-  foo = await res;
+  const foo = await res;
   hideSpinner();
   if (foo.ok) {
     showStatusBox();
-    j = await res.json();
+    const j = await res.json();
     var reqKey = j.requestKeys[0];
     document.getElementById('status-message').textContent =
       'Transaction Pending...';
@@ -403,14 +406,14 @@ async function listen() {
         document.getElementById('status-message').textContent =
           'TRANSFER SUCCEEDED';
         document.getElementById('status-error').textContent = '';
-        window.localStorage.removeItem('xchain-requestKey');
-        window.localStorage.removeItem('xchain-server');
+        window.localStorage.removeItem('xchain-request-key');
       } else {
         document.getElementById('status-message').textContent =
           'TRANSFER FAILED with error';
         document.getElementById('status-error').textContent = JSON.stringify(
           res.result.error.message
         );
+        window.localStorage.removeItem('xchain-request-key');
       }
     });
 }
@@ -421,13 +424,22 @@ async function finishXChain() {
   try {
     if (signedTransaction) {
       try {
-        const result = await fetch(`${State.targetHost}/api/v1/send`, {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          method: 'POST',
-          body: `{ "cmds": [${signedTransaction}] }`,
-        });
+        const testLocal = await fetch(
+          `${State.targetHost}/api/v1/local`,
+          makeRawRequestInit(signedTransaction)
+        ).then(r => r.json());
+        if (
+          testLocal.result.status === 'failure' &&
+          testLocal.result.error.message.includes('pact completed')
+        ) {
+          setError(testLocal.result.error.message);
+          return;
+        }
+
+        const result = await fetch(
+          `${State.targetHost}/api/v1/send`,
+          makeRawRequestInit(`{ "cmds": [${signedTransaction}] }`)
+        );
         handleResult(result);
         document.getElementById('result-message').textContent =
           JSON.stringify(result);
@@ -625,8 +637,7 @@ function onInputGasPrice(e) {
   State.gasPrice = e.target.value;
 }
 
-async function getCoinDetailsOfGasPayer(e) {
-  e.preventDefault();
+async function getCoinDetailsOfGasPayer() {
   State.gasPayerAccountDetails = await getCoinDetails(State.gasPayer);
 }
 
@@ -677,15 +688,19 @@ function isAccountEligibleForGasPayment() {
 // INITIATION FUNCTIONS
 window.addEventListener(
   'load',
-  function (event) {
+  async function () {
     State.server = State.server ? State.server : 'api.chainweb.com';
     State.networkId = State.networkId ? State.networkId : 'mainnet01';
     State.requestKey = State.requestKey ? State.requestKey : '';
+    State.gasPayer = State.gasPayer ? State.gasPayer : 'kadena-xchain-gas';
+
     if (State.requestKey && State.requestKey.length > 0) {
-      getPact();
+      await getPact();
     }
     validateServer();
     validatePact();
+    await validateGasPayer();
+    await fillSigData();
     document.getElementById('submit-button').addEventListener(
       'click',
       async function (event) {
@@ -703,25 +718,9 @@ window.addEventListener(
       false
     );
 
-    document.getElementById('gas-payer').addEventListener('blur', async e => {
-      await getCoinDetailsOfGasPayer(e);
-      clearError();
-      if (isAccountEligibleForGasPayment()) {
-        const sigDataMessage = document.getElementById('sig-data-message');
-        const signedTransactionWrapper = document.getElementById(
-          'signed-transaction-wrapper'
-        );
-        const signedTransaction = document.getElementById('signed-transaction');
-        if (window.isGasStation(State.gasPayerAccountDetails)) {
-          sigDataMessage.classList.add('hidden');
-          signedTransactionWrapper.classList.add('hidden');
-          signedTransaction.value = '';
-          clearError();
-        } else {
-          sigDataMessage.classList.remove('hidden');
-          signedTransactionWrapper.classList.remove('hidden');
-        }
-      }
+    document.getElementById('gas-payer').addEventListener('blur', e => {
+      State.gasPayer = e.target.value;
+      validateGasPayer();
     });
 
     [
@@ -764,6 +763,27 @@ window.addEventListener(
 
   false
 );
+
+async function validateGasPayer() {
+  await getCoinDetailsOfGasPayer();
+  clearError();
+  if (isAccountEligibleForGasPayment()) {
+    const sigDataMessage = document.getElementById('sig-data-message');
+    const signedTransactionWrapper = document.getElementById(
+      'signed-transaction-wrapper'
+    );
+    const signedTransaction = document.getElementById('signed-transaction');
+    if (window.isGasStation(State.gasPayerAccountDetails)) {
+      sigDataMessage.classList.add('hidden');
+      signedTransactionWrapper.classList.add('hidden');
+      signedTransaction.value = '';
+      clearError();
+    } else {
+      sigDataMessage.classList.remove('hidden');
+      signedTransactionWrapper.classList.remove('hidden');
+    }
+  }
+}
 
 async function fillSigData() {
   enableSubmit();
@@ -904,4 +924,14 @@ class Keys extends Array {
       return { ...acc, [publicKey]: null };
     }, {});
   }
+}
+
+function makeRawRequestInit(stringBody) {
+  return {
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    method: 'POST',
+    body: stringBody,
+  };
 }
