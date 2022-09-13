@@ -281,7 +281,7 @@ class State {
     return document.getElementById('sender').textContent;
   }
   static get senderPublicKey() {
-    return State.sender.split(':')[1]
+    return State.sender.split(':')[1];
   }
 
   static get receiver() {
@@ -746,12 +746,9 @@ async function fillSigData() {
   );
 
   c = Pact.simple.cont.createCommand(
-    [
-      {
-        publicKey: State.senderPublicKey,
-        clist: [{ name: 'coin.GAS', args: [] }],
-      },
-    ],
+    new Keys()
+      .add(State.senderPublicKey, 'coin.GAS')
+      .add(State.senderPublicKey, 'coin.TRANSFER', ['from', 'to', 100]),
     `transfer.chainweb ${State.requestKey} ${new Date().toLocaleString()}`,
     1,
     pactId,
@@ -826,4 +823,42 @@ function getCoinDetails(account) {
     .catch(e => {
       throw e;
     });
+}
+
+/**
+ * Utility class that can be used to create Signers element
+ *
+ * @class Keys
+ * @extends {Array}
+ */
+class Keys extends Array {
+  /**
+    [
+      {
+        publicKey: State.senderPublicKey,
+        clist: [{ name: 'coin.GAS', args: [] }],
+      },
+    ],
+   */
+
+  add(publicKey, name, args = []) {
+    const foundKey = this.find(k => k.publicKey === publicKey);
+    if (foundKey) {
+      if (name) {
+        const foundScope = foundKey.clist.find(c => c.name === name);
+        if (foundScope) {
+          foundScope.args = args;
+        } else {
+          foundKey.clist.push({ name, args });
+        }
+      }
+    } else {
+      if (name) {
+        this.push({ publicKey, clist: [{ name, args }] });
+      } else {
+        this.push({ publicKey });
+      }
+    }
+    return this;
+  }
 }
