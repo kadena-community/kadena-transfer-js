@@ -1,5 +1,5 @@
 //UTILITY FUNCTIONS
-const mkReq = (cmd) => {
+const mkReq = cmd => {
   return {
     headers: {
       'Content-Type': 'application/json',
@@ -9,13 +9,13 @@ const mkReq = (cmd) => {
   };
 };
 
-const is_hexadecimal = (str) => {
+const is_hexadecimal = str => {
   const regexp = /^[0-9a-fA-F]+$/;
   if (regexp.test(str)) return true;
   else return false;
 };
 
-const convertDecimal = (decimal) => {
+const convertDecimal = decimal => {
   decimal = decimal.toString();
   if (decimal.includes('.')) {
     return decimal;
@@ -28,7 +28,7 @@ const convertDecimal = (decimal) => {
 
 const createTime = () => Math.round(new Date().getTime() / 1000) - 50;
 
-const checkKey = (key) => {
+const checkKey = key => {
   if (key.length !== 64) {
     throw 'Key does not have length of 64';
   } else if (!is_hexadecimal(key)) {
@@ -37,7 +37,7 @@ const checkKey = (key) => {
   return true;
 };
 
-const checkSecretKey = (key) => {
+const checkSecretKey = key => {
   if (key.length !== 64 && key.length !== 128) {
     throw 'Key does not have the correct length';
   } else if (!is_hexadecimal(key)) {
@@ -58,12 +58,12 @@ async function getVersion(server) {
 
 async function verifyNode(node) {
   return getVersion(node)
-    .then((networkId) => {
+    .then(networkId => {
       document.getElementById('networkId').classList.remove('red');
       document.getElementById('networkId').textContent = networkId;
       State.networkId = networkId;
     })
-    .catch((e) => {
+    .catch(e => {
       State.server = '';
       State.networkId = '';
       document.getElementById('networkId').classList.add('red');
@@ -393,7 +393,7 @@ async function listen() {
       { listen: reqKey },
       `https://${State.server}/chainweb/0.0/${State.networkId}/chain/${State.targetChainId}/pact`
     )
-    .then((res) => {
+    .then(res => {
       console.log(res);
       if (res.result.status === 'success') {
         document.getElementById('status-message').textContent =
@@ -668,7 +668,7 @@ window.addEventListener(
       false
     );
 
-    document.getElementById('gas-payer').addEventListener('blur', async (e) => {
+    document.getElementById('gas-payer').addEventListener('blur', async e => {
       await getCoinDetailsOfGasPayer(e);
       if (isAccountEligibleForGasPayment()) {
         const sigDataMessage = document.getElementById('sig-data-message');
@@ -686,13 +686,13 @@ window.addEventListener(
       document.getElementById('gas-payer'),
       document.getElementById('gas-limit'),
       document.getElementById('gas-price'),
-    ].forEach((e) => {
-      e.addEventListener('blur', (e) => {
+    ].forEach(e => {
+      e.addEventListener('blur', e => {
         fillSigData();
       });
     });
 
-    document.getElementById('click-to-copy').addEventListener('click', (e) => {
+    document.getElementById('click-to-copy').addEventListener('click', e => {
       e.preventDefault();
       const clickToCopyElement = e.target;
       const textArea = document.getElementById('sig-data');
@@ -776,8 +776,8 @@ function isBalanceSufficient(gasPrice, gasLimit, res) {
 function isSingleSig(res) {
   try {
     return (
-      res.result.data.guard.filter((g) => g.keys && g.keys.length === 1)
-        .length > 0
+      res.result.data.guard.filter(g => g.keys && g.keys.length === 1).length >
+      0
     );
   } catch (e) {
     return false;
@@ -807,7 +807,7 @@ function getCoinDetails(account) {
       },
       State.targetHost
     )
-    .catch((e) => {
+    .catch(e => {
       throw e;
     });
 }

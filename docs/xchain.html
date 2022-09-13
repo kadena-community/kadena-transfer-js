@@ -62,57 +62,57 @@
 
       </div>
 
-          <div id="gas-payer-form" class="ui form">
-            <div class="field">
-              <label>Gas payer account</label>
-              <input type="text" id="gas-payer" placeholder="kadena-xchain-gas" value="kadena-xchain-gas">
-              <!-- <button id="verify-gas-payer" class="ui primary button">Verify</button> -->
-            </div>
+      <div id="gas-payer-form" class="ui form">
+        <div class="field">
+          <label>Gas payer account</label>
+          <input type="text" id="gas-payer" placeholder="kadena-xchain-gas" value="kadena-xchain-gas">
+          <!-- <button id="verify-gas-payer" class="ui primary button">Verify</button> -->
+        </div>
 
-            <div class="field">
-              <label>Gas price</label>
-              <input type="text" id="gas-price" placeholder="0.00000001" value="0.00000001">
-            </div>
+        <div class="field">
+          <label>Gas price</label>
+          <input type="text" id="gas-price" placeholder="0.00000001" value="0.00000001">
+        </div>
 
-            <div class="field">
-              <label>Gas limit</label>
-              <input type="text" id="gas-limit" placeholder="750" value="750">
-            </div>
+        <div class="field">
+          <label>Gas limit</label>
+          <input type="text" id="gas-limit" placeholder="750" value="750">
+        </div>
 
-            <div id="sig-data-message" class="ui message hidden">
-              <div class="header">SigData</div>
-              <textarea name="SigData" id="sig-data" cols="30" rows="10" disabled="disabled">
+        <div id="sig-data-message" class="ui message hidden">
+          <div class="header">SigData</div>
+          <textarea name="SigData" id="sig-data" cols="30" rows="10" disabled="disabled">
               </textarea>
-              <button id="click-to-copy" class="ui secondary basic button">Click To Copy</button>
-            </div>
-          </div>
-
-          <div id="submit-block">
-            <button id="submit-button" class="ui primary button" disabled>Finish Cross Chain Transfer</button>
-          </div>
-
-          <div id="acct-err" class="ui center error message"></div>
-
-          <div id="result-message" class="ui compact message hidden"></div>
+          <button id="click-to-copy" class="ui secondary basic button">Click To Copy</button>
         </div>
-      </form>
+      </div>
 
-      <div id="status-box" class="ui compact message result hidden">
-        <div id="reqkey-box">
-          <div class="header"> Request Key </div>
-          <p id="request-key" />
-        </div>
+      <div id="submit-block">
+        <button id="submit-button" class="ui primary button" disabled>Finish Cross Chain Transfer</button>
+      </div>
 
-        <br />
-        <div>
-          <div class="header" id="status-message"></div>
-          <p id="status-error">
-            <button id="listen-button" class="ui button" disabled>Listen Again</button>
-        </div>
+      <div id="acct-err" class="ui center error message"></div>
 
+      <div id="result-message" class="ui compact message hidden"></div>
+    </div>
+    </form>
+
+    <div id="status-box" class="ui compact message result hidden">
+      <div id="reqkey-box">
+        <div class="header"> Request Key </div>
+        <p id="request-key" />
+      </div>
+
+      <br />
+      <div>
+        <div class="header" id="status-message"></div>
+        <p id="status-error">
+          <button id="listen-button" class="ui button" disabled>Listen Again</button>
       </div>
 
     </div>
+
+  </div>
 </body>
 <style>
   .dropdown {
