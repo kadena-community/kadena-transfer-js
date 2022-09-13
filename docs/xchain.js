@@ -350,7 +350,7 @@ class State {
   }
 }
 
-var getProof = async function () {
+async function getProof() {
   const targetChainId = State.targetChainId;
   const pactId = State.pactId;
   const spvCmd = { targetChainId: targetChainId, requestKey: pactId };
@@ -369,7 +369,7 @@ var getProof = async function () {
   } catch (e) {
     throw 'Initial transfer is not confirmed yet. Please wait and try again.';
   }
-};
+}
 
 const handleResult = async function (res) {
   const foo = await res;
@@ -475,6 +475,33 @@ async function finishXChain() {
         proof: proof,
         networkId: networkId,
       };
+      try {
+        const c = Pact.simple.cont.createCommand(
+          contCmd.keyPairs,
+          contCmd.nonce,
+          contCmd.step,
+          contCmd.pactId,
+          contCmd.rollback,
+          contCmd.envData,
+          contCmd.meta,
+          contCmd.proof,
+          contCmd.networkId
+        );
+        const testLocal = await fetch(
+          `${State.targetHost}/api/v1/local`,
+          makeRawRequestInit(JSON.stringify(c.cmds[0]))
+        ).then(r => r.json());
+        if (
+          testLocal.result.status === 'failure' &&
+          testLocal.result.error.message.includes('pact completed')
+        ) {
+          setError(testLocal.result.error.message);
+          return;
+        }
+      } catch (e) {
+        setError(e);
+        return;
+      }
       try {
         const result = await sendNonJson(contCmd, State.targetHost);
         handleResult(result);
@@ -788,7 +815,7 @@ async function validateGasPayer() {
 async function fillSigData() {
   enableSubmit();
   if (!window.proof) {
-    window.proof = await getProof();
+    window.proof = await getProof().catch(setError);
   }
   const pactId = State.pactId;
   const networkId = State.networkId;
@@ -888,7 +915,7 @@ class Keys extends Array {
   /**
     [
       {
-        publicKey: State.senderPublicKey,
+        publicKey: "keyblaablabala",
         clist: [{ name: 'coin.GAS', args: [] }],
       },
     ],
