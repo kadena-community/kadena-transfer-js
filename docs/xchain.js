@@ -209,14 +209,14 @@ class State {
   }
 
   static set requestKey(value) {
-    window.localStorage.setItem('xchain-request-key', value);
-    document.getElementById('pact-id').value = value;
+    window.localStorage.setItem('xchain-request-key', value.trim());
+    document.getElementById('pact-id').value = value.trim();
   }
 
   static get requestKey() {
     const ls = getIfSetLocalStorage('xchain-request-key');
     if (ls) {
-      return ls;
+      return ls.trim();
     }
 
     const requestKey = document.getElementById('pact-id').value.trim();
