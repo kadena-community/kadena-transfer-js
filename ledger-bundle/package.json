@@ -4,7 +4,7 @@
   "description": "A bundler for ledger related hardware (Kadena)",
   "main": "main.js",
   "scripts": {
-    "build": "browserify main.js -p [ tsify --noImplicitAny ] > ../util/ledger-os.js"
+    "build": "browserify main.js -p [ tsify --noImplicitAny ] > ../docs/util/ledger-os.js"
   },
   "author": "Alexandre Garcia de Oliveira (Romefeller)",
   "license": "ISC",
