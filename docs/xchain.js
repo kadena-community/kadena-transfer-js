@@ -94,7 +94,6 @@ async function findSrcChain() {
   const pactId = State.pactId;
   const server = State.server;
   const networkId = State.networkId;
-  console.log(networkId);
   const chainInfoPromises = Array.from(new Array(20)).map((_, chainId) => {
     const host = `https://${server}/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
     return Pact.fetch.poll({ requestKeys: [pactId] }, host);
@@ -123,8 +122,13 @@ async function getPact() {
     try {
       let source = requestKeys[0].chainId;
       let tx = requestKeys[0].tx;
-      let [sender, receiver, g, target, amount] =
-        tx.continuation.continuation.args;
+      let [
+        sender,
+        receiver,
+        g,
+        target,
+        amount,
+      ] = tx.continuation.continuation.args;
       document
         .getElementById('pact-message')
         .setAttribute('class', 'ui compact message');
@@ -137,7 +141,6 @@ async function getPact() {
       State.receiver = receiver;
       State.rg = JSON.stringify(g);
       State.amount = amount;
-      enableSubmit();
     } catch (e) {
       document
         .getElementById('pact-message')
@@ -201,6 +204,7 @@ class State {
     window.localStorage.setItem('xchain-networkId', value);
     document.getElementById('networkId').textContent = value;
   }
+
   static get networkId() {
     const ls = getIfSetLocalStorage('xchain-networkId');
     if (ls) return ls;
@@ -348,6 +352,14 @@ class State {
   static get gasPrice() {
     return Number.parseFloat(document.getElementById('gas-price').value);
   }
+
+  static get proof() {
+    return window.proof;
+  }
+
+  static set proof(val) {
+    window.proof = val;
+  }
 }
 
 async function getProof() {
@@ -358,8 +370,10 @@ async function getProof() {
   try {
     const res = await fetch(`${host}/spv`, mkReq(spvCmd));
     let foo = await res;
+
     if (foo.ok) {
       const proof = await res.json();
+      State.proof = proof;
       return proof;
     } else {
       const proof = await res.text();
@@ -367,7 +381,9 @@ async function getProof() {
       throw proof;
     }
   } catch (e) {
-    throw 'Initial transfer is not confirmed yet. Please wait and try again.';
+    setError(
+      'Initial transfer is not confirmed yet. Please wait and try again.'
+    );
   }
 }
 
@@ -441,15 +457,15 @@ async function finishXChain() {
           makeRawRequestInit(`{ "cmds": [${signedTransaction}] }`)
         );
         handleResult(result);
-        document.getElementById('result-message').textContent =
-          JSON.stringify(result);
+        document.getElementById('result-message').textContent = JSON.stringify(
+          result
+        );
       } catch (e) {
         setError(e);
       }
     } else {
-      let proof;
-      if (!window.proof) {
-        proof = await getProof();
+      if (!State.proof) {
+        State.proof = await getProof().catch(setError);
       }
       const targetChainId = State.targetChainId;
       const pactId = State.pactId;
@@ -472,7 +488,7 @@ async function finishXChain() {
         rollback: false,
         step: 1,
         meta: m,
-        proof: proof,
+        proof: State.proof,
         networkId: networkId,
       };
       try {
@@ -505,8 +521,9 @@ async function finishXChain() {
       try {
         const result = await sendNonJson(contCmd, State.targetHost);
         handleResult(result);
-        document.getElementById('result-message').textContent =
-          JSON.stringify(result);
+        document.getElementById('result-message').textContent = JSON.stringify(
+          result
+        );
       } catch (e) {
         setError(e);
       }
@@ -563,6 +580,8 @@ function clearError() {
 }
 
 function setError(msg) {
+  hideSigData();
+  disableSubmit();
   document.getElementById('acct-err').innerText = msg;
   document.getElementById('acct-err').classList.remove('hidden');
   document.getElementById('kadena-form').setAttribute('class', 'ui form error');
@@ -571,6 +590,10 @@ function setError(msg) {
 function setSigData(msg) {
   const sigDataTextarea = document.getElementById('sig-data');
   sigDataTextarea.value = msg;
+}
+
+function sigData() {
+  return document.getElementById('sig-data').value;
 }
 
 function clearSigData() {
@@ -603,12 +626,12 @@ function validateServer() {
       try {
         const val = event.target.value;
         if (val !== null && val !== '' && State.server !== val) {
-          delete window.proof;
+          clearAll();
           State.server = val;
           verifyNode(val).then(() => {
             if (complete()) {
               State.server = val;
-              getPact();
+              fetchInfo();
             } else {
               document
                 .getElementById('pact-message')
@@ -618,7 +641,6 @@ function validateServer() {
         }
       } catch (err) {
         console.log(err);
-        disableSubmit();
         setError(err);
       }
     },
@@ -626,17 +648,26 @@ function validateServer() {
   );
 }
 
+function clearAll() {
+  State.proof = null;
+  clearSigData();
+  hideSigData();
+}
+
 function validatePact() {
   clearError();
   hideStatusBox();
   document.getElementById('pact-id').addEventListener(
     'input',
-    function (event) {
+    async function (event) {
       State.requestKey = event.target.value;
-      delete window.proof;
+      clearAll();
       try {
         if (complete()) {
-          getPact();
+          await getPact();
+          await getProof();
+          await fetchInfo();
+          await completeSigData();
         } else {
           document
             .getElementById('pact-message')
@@ -644,7 +675,6 @@ function validatePact() {
         }
       } catch (err) {
         console.log(err);
-        disableSubmit();
         setError(err);
       }
     },
@@ -721,13 +751,12 @@ window.addEventListener(
     State.requestKey = State.requestKey ? State.requestKey : '';
     State.gasPayer = State.gasPayer ? State.gasPayer : 'kadena-xchain-gas';
 
-    if (State.requestKey && State.requestKey.length > 0) {
-      await getPact();
-    }
     validateServer();
     validatePact();
-    await validateGasPayer();
-    await fillSigData();
+    await getPact();
+    await getProof();
+    await fetchInfo();
+    await completeSigData();
     document.getElementById('submit-button').addEventListener(
       'click',
       async function (event) {
@@ -745,18 +774,20 @@ window.addEventListener(
       false
     );
 
-    document.getElementById('gas-payer').addEventListener('blur', e => {
+    document.getElementById('gas-payer').addEventListener('blur', async e => {
       State.gasPayer = e.target.value;
       validateGasPayer();
+      await getProof();
+      await fetchInfo();
+      await completeSigData();
     });
 
     [
-      document.getElementById('gas-payer'),
       document.getElementById('gas-limit'),
       document.getElementById('gas-price'),
     ].forEach(e => {
       e.addEventListener('blur', e => {
-        fillSigData();
+        fetchInfo();
       });
     });
 
@@ -791,35 +822,80 @@ window.addEventListener(
   false
 );
 
+async function checkTransaction() {
+  try {
+    if (!State.targetChainId) {
+      throw Error('Request Key is not a cross chain Transaction');
+    }
+    if (!State.gasPayerAccountDetails.result.status) {
+      throw Error(JSON.stringify(State.gasPayerAccountDetails));
+    }
+    if (!State.proof) {
+      getProof();
+      throw Error('Waiting for Proof...');
+    }
+    return true;
+  } catch (e) {
+    setError(e);
+  }
+}
+
+async function fetchInfo() {
+  await validateGasPayer();
+  await completeSigData();
+}
+
 async function validateGasPayer() {
   await getCoinDetailsOfGasPayer();
   clearError();
   if (isAccountEligibleForGasPayment()) {
-    const sigDataMessage = document.getElementById('sig-data-message');
-    const signedTransactionWrapper = document.getElementById(
-      'signed-transaction-wrapper'
-    );
-    const signedTransaction = document.getElementById('signed-transaction');
     if (window.isGasStation(State.gasPayerAccountDetails)) {
-      sigDataMessage.classList.add('hidden');
-      signedTransactionWrapper.classList.add('hidden');
-      signedTransaction.value = '';
-      clearError();
+      hideSigData();
     } else {
-      sigDataMessage.classList.remove('hidden');
-      signedTransactionWrapper.classList.remove('hidden');
+      if (checkTransaction()) {
+        showSigData();
+      }
     }
   }
 }
 
-async function fillSigData() {
-  enableSubmit();
-  if (!window.proof) {
-    window.proof = await getProof().catch(setError);
-  }
-  const pactId = State.pactId;
-  const networkId = State.networkId;
+function hideSigData() {
+  const sigDataMessage = document.getElementById('sig-data-message');
+  const signedTransactionWrapper = document.getElementById(
+    'signed-transaction-wrapper'
+  );
+  const signedTransaction = document.getElementById('signed-transaction');
+  sigDataMessage.classList.add('hidden');
+  signedTransactionWrapper.classList.add('hidden');
+  signedTransaction.value = '';
+  clearError();
+}
 
+function showSigData() {
+  const sigDataMessage = document.getElementById('sig-data-message');
+  const signedTransactionWrapper = document.getElementById(
+    'signed-transaction-wrapper'
+  );
+  sigDataMessage.classList.remove('hidden');
+  signedTransactionWrapper.classList.remove('hidden');
+}
+
+async function completeSigData() {
+  try {
+    await checkTransaction();
+    if (isAccountEligibleForGasPayment()) {
+      if (window.isGasStation(State.gasPayerAccountDetails)) enableSubmit();
+      else {
+        enableSubmit();
+        await fillSigData();
+      }
+    }
+  } catch (e) {
+    setError(e);
+  }
+}
+
+async function fillSigData() {
   const m = Pact.lang.mkMeta(
     State.gasPayer,
     State.targetChainId,
@@ -829,25 +905,24 @@ async function fillSigData() {
     28800
   );
 
-  const keys = new Keys().add(State.senderPublicKey, 'coin.GAS'),
+  const keys = new Keys().add(
+      window.getGasPayerPublicKey(State.gasPayerAccountDetails),
+      'coin.GAS'
+    ),
     c = Pact.simple.cont.createCommand(
       keys,
       `transfer.chainweb ${State.requestKey} ${new Date().toLocaleString()}`,
       1,
-      pactId,
+      State.pactId,
       false,
       undefined,
       m,
-      proof,
-      networkId
+      State.proof,
+      State.networkId
     ).cmds[0];
 
   c.sigs = keys.getSigsObject();
-
-  setTimeout(
-    () =>
-      (document.getElementById('sig-data').value = JSON.stringify(c, null, 2))
-  );
+  setTimeout(() => setSigData(JSON.stringify(c, null, 2)));
 }
 
 function isGasStation(res) {
@@ -877,6 +952,9 @@ function isSingleSig(res) {
   }
 }
 
+function getGasPayerPublicKey(res) {
+  return res.result.data?.guard.keys[0];
+}
 /**
  * Retreive information on gas-payer-account
  *
