@@ -88,18 +88,20 @@ const sendNonJson = async function (cmd, apiHost) {
 };
 
 async function findSrcChain() {
-
   const pactId = State.pactId;
   const server = State.server;
   const networkId = State.networkId;
-  const chainInfoPromises = Array.from(new Array(20)).map((_, chainId) => {
-    const host = `https://${server}/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
-    const pactInfo = await Pact.fetch.poll({ requestKeys: [pactId] }, host);
-    if (pactInfo[pactId]) {
-      arr.push({ chainId: chainId, tx: pactInfo[pactId] });
-    }
-    return arr;
-  }, []);
+  const chainInfoPromises = Array.from(new Array(20)).map(
+    async (_, chainId) => {
+      const host = `https://${server}/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
+      const pactInfo = await Pact.fetch.poll({ requestKeys: [pactId] }, host);
+      if (pactInfo[pactId]) {
+        arr.push({ chainId: chainId, tx: pactInfo[pactId] });
+      }
+      return arr;
+    },
+    [],
+  );
   return pact;
 }
 
@@ -116,13 +118,8 @@ async function getPact() {
     try {
       let source = requestKeys[0].chainId;
       let tx = requestKeys[0].tx;
-      let [
-        sender,
-        receiver,
-        g,
-        target,
-        amount,
-      ] = tx.continuation.continuation.args;
+      let [sender, receiver, g, target, amount] =
+        tx.continuation.continuation.args;
       document
         .getElementById('pact-message')
         .setAttribute('class', 'ui compact message');
@@ -378,10 +375,10 @@ async function getProof() {
     }
   } catch (e) {
     setError(
-      'Initial transfer is not confirmed yet. Please wait and try again.'
+      'Initial transfer is not confirmed yet. Please wait and try again.',
     );
   }
-};
+}
 
 const handleResult = async function (res) {
   foo = await res;
@@ -440,7 +437,7 @@ async function finishXChain() {
       try {
         const testLocal = await fetch(
           `${State.targetHost}/api/v1/local`,
-          makeRawRequestInit(signedTransaction)
+          makeRawRequestInit(signedTransaction),
         ).then(r => r.json());
         if (
           testLocal.result.status === 'failure' &&
@@ -452,12 +449,11 @@ async function finishXChain() {
 
         const result = await fetch(
           `${State.targetHost}/api/v1/send`,
-          makeRawRequestInit(`{ "cmds": [${signedTransaction}] }`)
+          makeRawRequestInit(`{ "cmds": [${signedTransaction}] }`),
         );
         handleResult(result);
-        document.getElementById('result-message').textContent = JSON.stringify(
-          result
-        );
+        document.getElementById('result-message').textContent =
+          JSON.stringify(result);
       } catch (e) {
         setError(e);
       }
@@ -477,7 +473,7 @@ async function finishXChain() {
         gasPrice,
         gasLimit,
         createTime(),
-        28800
+        28800,
       );
       const contCmd = {
         type: 'cont',
@@ -499,11 +495,11 @@ async function finishXChain() {
           contCmd.envData,
           contCmd.meta,
           contCmd.proof,
-          contCmd.networkId
+          contCmd.networkId,
         );
         const testLocal = await fetch(
           `${State.targetHost}/api/v1/local`,
-          makeRawRequestInit(JSON.stringify(c.cmds[0]))
+          makeRawRequestInit(JSON.stringify(c.cmds[0])),
         ).then(r => r.json());
         if (
           testLocal.result.status === 'failure' &&
@@ -519,9 +515,8 @@ async function finishXChain() {
       try {
         const result = await sendNonJson(contCmd, State.targetHost);
         handleResult(result);
-        document.getElementById('result-message').textContent = JSON.stringify(
-          result
-        );
+        document.getElementById('result-message').textContent =
+          JSON.stringify(result);
       } catch (e) {
         setError(e);
       }
@@ -632,6 +627,7 @@ function validateServer() {
               document
                 .getElementById('pact-message')
                 .setAttribute('class', 'ui compact message hidden');
+            }
           });
         }
       } catch (err) {
@@ -667,6 +663,7 @@ function validatePact() {
           document
             .getElementById('pact-message')
             .setAttribute('class', 'ui compact message hidden');
+        }
       } catch (err) {
         console.log(err);
         setError(err);
@@ -795,7 +792,7 @@ async function validateGasPayer() {
 function hideSigData() {
   const sigDataMessage = document.getElementById('sig-data-message');
   const signedTransactionWrapper = document.getElementById(
-    'signed-transaction-wrapper'
+    'signed-transaction-wrapper',
   );
   const signedTransaction = document.getElementById('signed-transaction');
   sigDataMessage.classList.add('hidden');
@@ -807,7 +804,7 @@ function hideSigData() {
 function showSigData() {
   const sigDataMessage = document.getElementById('sig-data-message');
   const signedTransactionWrapper = document.getElementById(
-    'signed-transaction-wrapper'
+    'signed-transaction-wrapper',
   );
   sigDataMessage.classList.remove('hidden');
   signedTransactionWrapper.classList.remove('hidden');
@@ -835,12 +832,12 @@ async function fillSigData() {
     State.gasPrice,
     State.gasLimit,
     createTime(),
-    28800
+    28800,
   );
 
   const keys = new Keys().add(
       window.getGasPayerPublicKey(State.gasPayerAccountDetails),
-      'coin.GAS'
+      'coin.GAS',
     ),
     c = Pact.simple.cont.createCommand(
       keys,
@@ -851,7 +848,7 @@ async function fillSigData() {
       undefined,
       m,
       State.proof,
-      State.networkId
+      State.networkId,
     ).cmds[0];
 
   c.sigs = keys.getSigsObject();
@@ -906,10 +903,10 @@ function getCoinDetails(account) {
           0.00000001,
           750,
           new Date().getTime(),
-          300
+          300,
         ),
       },
-      State.targetHost
+      State.targetHost,
     )
     .catch(e => {
       throw e;
