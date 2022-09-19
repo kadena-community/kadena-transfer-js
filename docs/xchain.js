@@ -61,8 +61,11 @@ async function verifyNode(node) {
     .then(networkId => {
       document.getElementById('networkId').classList.remove('red');
       document.getElementById('networkId').textContent = networkId;
+      State.networkId = networkId;
     })
     .catch(e => {
+      State.server = '';
+      State.networkId = '';
       document.getElementById('networkId').classList.add('red');
       document.getElementById('networkId').textContent = 'Not a Chainweb Node';
     });
@@ -91,18 +94,19 @@ async function findSrcChain() {
   const pactId = State.pactId;
   const server = State.server;
   const networkId = State.networkId;
-  const chainInfoPromises = Array.from(new Array(20)).map(
-    async (_, chainId) => {
-      const host = `https://${server}/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
-      const pactInfo = await Pact.fetch.poll({ requestKeys: [pactId] }, host);
-      if (pactInfo[pactId]) {
-        arr.push({ chainId: chainId, tx: pactInfo[pactId] });
-      }
-      return arr;
-    },
-    [],
-  );
-  return pact;
+  const chainInfoPromises = Array.from(new Array(20)).map((_, chainId) => {
+    const host = `https://${server}/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
+    return Pact.fetch.poll({ requestKeys: [pactId] }, host);
+  });
+  const chainInfos = await Promise.all(chainInfoPromises);
+
+  let found;
+  chainInfos.map(async (pactInfo, chainId) => {
+    if (pactInfo[pactId]) {
+      found = { chainId: chainId, tx: pactInfo[pactId] };
+    }
+  });
+  return [found];
 }
 
 async function getPact() {
@@ -357,9 +361,7 @@ async function getProof() {
   const targetChainId = State.targetChainId;
   const pactId = State.pactId;
   const spvCmd = { targetChainId: targetChainId, requestKey: pactId };
-  const server = document.getElementById('server').value;
-  const networkId = document.getElementById('networkId').textContent;
-  const host = `https://${server}/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
+  const host = State.sourceHost;
   try {
     const res = await fetch(`${host}/spv`, mkReq(spvCmd));
     let foo = await res;
@@ -381,11 +383,11 @@ async function getProof() {
 }
 
 const handleResult = async function (res) {
-  foo = await res;
+  const foo = await res;
   hideSpinner();
   if (foo.ok) {
     showStatusBox();
-    j = await res.json();
+    const j = await res.json();
     var reqKey = j.requestKeys[0];
     document.getElementById('status-message').textContent =
       'Transaction Pending...';
@@ -403,14 +405,11 @@ const handleResult = async function (res) {
 async function listen() {
   document.getElementById('listen-button').disabled = false;
   showSpinner();
-  const chainId = document.getElementById('target-chain-id').textContent;
-  const server = document.getElementById('server').value;
-  const networkId = document.getElementById('networkId').textContent;
   const reqKey = document.getElementById('request-key').textContent;
   Pact.fetch
     .listen(
       { listen: reqKey },
-      `https://${server}/chainweb/0.0/${networkId}/chain/${chainId}/pact`,
+      `https://${State.server}/chainweb/0.0/${State.networkId}/chain/${State.targetChainId}/pact`,
     )
     .then(res => {
       console.log(res);
@@ -418,20 +417,21 @@ async function listen() {
         document.getElementById('status-message').textContent =
           'TRANSFER SUCCEEDED';
         document.getElementById('status-error').textContent = '';
-        localStorage.removeItem('xchain-requestKey');
-        localStorage.removeItem('xchain-server');
+        window.localStorage.removeItem('xchain-request-key');
       } else {
         document.getElementById('status-message').textContent =
           'TRANSFER FAILED with error';
         document.getElementById('status-error').textContent = JSON.stringify(
           res.result.error.message,
         );
+        window.localStorage.removeItem('xchain-request-key');
       }
     });
 }
 
 async function finishXChain() {
   disableSubmit();
+  const signedTransaction = document.getElementById('signed-transaction').value;
   try {
     if (signedTransaction) {
       try {
@@ -568,6 +568,7 @@ function hideSpinner() {
 
 function clearError() {
   document.getElementById('acct-err').innerText = '';
+  document.getElementById('acct-err').classList.add('hidden');
   document.getElementById('kadena-form').setAttribute('class', 'ui form');
 }
 
@@ -575,6 +576,7 @@ function setError(msg) {
   hideSigData();
   disableSubmit();
   document.getElementById('acct-err').innerText = msg;
+  document.getElementById('acct-err').classList.remove('hidden');
   document.getElementById('kadena-form').setAttribute('class', 'ui form error');
 }
 
@@ -673,6 +675,66 @@ function validatePact() {
   );
 }
 
+function onInputGasLimit(e) {
+  e.preventDefault();
+  clearError();
+  State.gasLimit = e.target.value;
+}
+
+function onInputGasPrice(e) {
+  e.preventDefault();
+  clearError();
+  State.gasPrice = e.target.value;
+}
+
+async function getCoinDetailsOfGasPayer() {
+  State.gasPayerAccountDetails = await getCoinDetails(State.gasPayer);
+}
+
+function isAccountEligibleForGasPayment() {
+  if (State.gasPayerAccountDetails.result.status === 'failure') {
+    // an error occurrred
+    if (
+      State.gasPayerAccountDetails.result.error.message.includes(
+        'row not found',
+      )
+    ) {
+      setError(
+        `Account ${State.gasPayer} does not exist yet on the target chain (${State.targetChainId})`,
+      );
+    }
+
+    return false;
+  }
+
+  const isGasStation = window.isGasStation(State.gasPayerAccountDetails);
+  const isBalanceSufficient = window.isBalanceSufficient(
+    State.gasPrice,
+    State.gasLimit,
+    State.gasPayerAccountDetails,
+  );
+  const isSingleSig = window.isSingleSig(State.gasPayerAccountDetails);
+
+  if (isGasStation && isBalanceSufficient) {
+    return true;
+  } else if (!isGasStation && isBalanceSufficient && isSingleSig) {
+    return true;
+  } else {
+    // error state
+    if (!isBalanceSufficient) {
+      setError(
+        `Balance of ${State.sender} is not sufficient ${State.gasPayerAccountDetails.result.data.balance}`,
+      );
+    } else if (!isSingleSig) {
+      setError(
+        `Account ${State.sender} requires multiple signatures which is currently not supported from this tool`,
+      );
+    } else {
+      throw new Error('Unknown error occurred');
+    }
+  }
+}
+
 // INITIATION FUNCTIONS
 window.addEventListener(
   'load',
@@ -749,6 +811,7 @@ window.addEventListener(
       .getElementById('gas-limit')
       .addEventListener('input', onInputGasLimit);
   },
+
   false,
 );
 
