@@ -697,7 +697,7 @@
    async function getAccountDetails(account, node){
      if (account.length>=3){
        try {
-         const m = Pact.lang.mkMeta("", "", gasPrice, gasPrice, createTime(), 28800);
+         const m = Pact.lang.mkMeta("", "", gasPrice, localGasLimit, createTime(), 28800);
          const tx = await Pact.fetch.local({
            pactCode: `(coin.details ${JSON.stringify(account)})`,
            meta: m
@@ -713,7 +713,7 @@
 
     async function getKeysetRef(keyset, node){
       try {
-        const m = Pact.lang.mkMeta("", "", gasPrice, gasPrice, createTime(), 28800);
+        const m = Pact.lang.mkMeta("", "", gasPrice, localGasLimit, createTime(), 28800);
         const tx = await Pact.fetch.local({
           pactCode: `(describe-keyset ${JSON.stringify(keyset)})`,
           meta: m
