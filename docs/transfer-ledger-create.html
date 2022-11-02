@@ -18,67 +18,7 @@
 
        // custom form validation rule
        $.fn.form.settings.rules.validSig = function(sig) {
-         if (sig.length === 128 && !isPriv(sig)) {
-           return validateSig(sig);
-         }
-         else return true;
-       };
-
-       $.fn.form.settings.rules.validPriv = function(sig) {
-         if (sig.length === 128 && isPriv(sig)){
-           return validatePriv(sig.slice(0,64))
-         } else if (sig.length === 64) {
-           return validatePriv(sig);
-         }
-         else return true;
-       };
-
-        $.fn.form.settings.rules.validEntry = function(sig) {
-          if (window.ledger)
-            return true;
-          if (sig.length === 128 || sig.length === 64) {
-            return true;
-          } else if (sig.length === 0){
-            if (document.getElementById("hash-string").innerText === ""){
-              return true;
-            } else return false;
-          }
-          else return false;
-        };
-
-       $.fn.form.settings.rules.checkKeyLength= function(key) {
-         if (document.getElementById("receiver-select").hidden === false){
-           if (document.getElementById("basic").classList.contains( 'active' )){
-             return key.length===64;
-           }
-           else return true;
-         }
-         else {
-           return true;
-         }
-       };
-
-       $.fn.form.settings.rules.checkCustomKeyLength= function(guard) {
-       if (document.getElementById("custom").classList.contains('active')){
-          guard = JSON.parse(guard);
-          if (guard.keys.length === 0) return false;
-          let validKey = guard.keys.filter(key => {
-            return key.length===64;
-          })
-          return validKey.length === guard.keys.length;
-        } else return true;
-      }
-
-       $.fn.form.settings.rules.checkPredicate = function(key) {
-         if (document.getElementById("receiver-select").hidden === false){
-           if (document.getElementById("custom").classList.contains( 'active' )){
-              let guard = JSON.parse(document.getElementById("custom-guard").value);
-              return (guard.pred === "keys-all" || guard.pred === "keys-any" || guard.pred === "keys-2");
-           } else return true;
-         }
-         else {
-           return true;
-         }
+         return sig.length === 128 && validateSig(sig);
        };
 
        $.fn.form.settings.rules.checkKeyset = function(keyset) {
@@ -109,25 +49,6 @@
                  {
                    type   : 'validSig',
                    prompt : 'Signature is invalid. Please check again'
-                 },
-                 {
-                   type   : 'validPriv',
-                   prompt : 'Private Key is invalid. Please check again'
-                 },
-                 {
-                   type   : 'validEntry',
-                   prompt : 'Length does not match a Private key or a Signature. Please check again'
-                 }
-               ]
-             },
-             fromAccount: {
-               identifier  : 'fromAccount',
-               rules: [
-                 {
-                   type   : 'minLength[3]',
-                 },
-                 {
-                   type   : 'maxLength[256]',
                  }
                ]
              },
@@ -135,36 +56,10 @@
                identifier  : 'toAccount',
                rules: [
                  {
-                   type   : 'maxLength[256]',
+                   type   : 'maxLength[66]',
                  },
                  {
-                   type   : 'minLength[3]',
-                 }
-               ]
-             },
-             toAccountPublicKey: {
-               identifier : 'basicPublicKey',
-               rules : [
-                 {
-                   type: 'checkKeyLength',
-                   prompt: 'Length does not match a Public Key'
-                 },
-                 {
-                   type: 'checkPredicate',
-                   prompt: 'Keyset Predicate is Invalid'
-                 }
-               ]
-             },
-             toAccountGuard: {
-               identifier : 'custom-guard',
-               rules : [
-                 {
-                   type: 'checkCustomKeyLength',
-                   prompt: 'Length does not match a Public Key'
-                 },
-                 {
-                   type: 'checkPredicate',
-                   prompt: 'Keyset Predicate is Invalid'
+                   type   : 'minLength[64]',
                  }
                ]
              },
@@ -330,24 +225,59 @@
 
      const DEFAULT_BIP32_PATH = "m/44'/626'/0'/0/0";
      async function signWithLedger(){
+        clearError();
         await getLedger();
 
-        if (window.pubKey === "") {
-          document.getElementById("publicKey").value = [ (await window.ledger.getPublicKey(DEFAULT_BIP32_PATH)).publicKey ];
-          document.getElementById("fromAccount").value = publicKey;
-        } else {
-          document.getElementById("publicKey").value = [ window.pubKey ];
+        let {fromChainId, toAccount, toChainId, amount} = getInputs();
+        var network = "mainnet01";
+        if (document.getElementById("network").innerText === "Testnet") {
+          network = "testnet04";
         }
-        getHash();
-        var cmd = document.getElementById("cmd").value
-        var txn = new TextEncoder().encode(cmd.cmds[0].cmd);
         try {
-          var signed = await window.ledger.signTransaction(DEFAULT_BIP32_PATH,txn);
-          var sig = signed.signature;
-          document.getElementById("signature").value = sig;
+          var rv = {};
+          if (isCrossChain(fromChainId, toChainId)) {
+            rv = await window.ledger.signTransferCrossChainTx({
+              path: DEFAULT_BIP32_PATH,
+              recipient: toAccount,
+              recipient_chainId: toChainId,
+              amount: amount,
+              chainId: fromChainId,
+              network: network,
+            });
+          } else {
+            if (document.getElementById("receiver-exist").hidden === false){
+              rv = await window.ledger.signTransferTx({
+                path: DEFAULT_BIP32_PATH,
+                recipient: toAccount,
+                amount: amount,
+                chainId: fromChainId,
+                network: network,
+              });
+            } else {
+              rv = await window.ledger.signTransferCreateTx({
+                path: DEFAULT_BIP32_PATH,
+                recipient: toAccount,
+                amount: amount,
+                chainId: fromChainId,
+                network: network,
+              });
+            }
+          }
+          document.getElementById("cmd").value = {
+            cmds: [rv.pact_command]
+          };
+          document.getElementById("signature").value = rv.pact_command.sigs[0].sig;
+          document.getElementById("hash-string").innerText = rv.pact_command.hash;
+          document.getElementById("publicKey").value = [ rv.pubkey ];
+          var prefix = "k:"
+          document.getElementById("fromAccount").value = prefix.concat(rv.pubkey);
           document.getElementById('submit-button').classList.remove("disabled");
         } catch (e) {
-          setError("Could not obtain the signature")
+          if (e instanceof TypeError) {
+            setError("Error: " + e.message)
+          } else {
+            setError("Could not obtain the signature")
+          }
         }
      }
 
@@ -392,9 +322,7 @@
        $('.form').form('reset');
        closeAccordion()
        enableFields()
-       document.getElementById("receiver-keyset").hidden = true;
        document.getElementById("receiver-exist").hidden = true;
-       document.getElementById("receiver-select").hidden = true;
        document.getElementById("receiver-keyset-fixed").value = null;
      }
 
@@ -450,21 +378,10 @@
      async function submit() {
        clearError();
        let cmd = document.getElementById("cmd").value
-       let sig = document.getElementById("signature").value;
 
-       //Sign with signature
        let apiHost = getNode(document.getElementById("fromChainId").value).host
        let targetHost = getNode(document.getElementById("toChainId").value).host
        let networkId=getNode(document.getElementById("toChainId").value).networkId
-       //Sign with Private Key
-       if (isPriv(sig)) {
-         cmd = getTransferCmd();
-         closeAccordion()
-       } else if (!isPriv(sig)) {
-       //Sign with Signature
-           cmd = signCmd(cmd, sig);
-           console.log(cmd);
-       }
        const txRes = await fetch(`${apiHost}/api/v1/send`, mkReq(cmd))
 
        document.getElementById('status-box').classList.remove("hidden")
@@ -591,27 +508,14 @@
        checkPublicKey(account, chainId).then(res => {
          if (!res) {}
          else if (res.result.status==="failure" && res.result.error.message.slice(0,24)==="with-read: row not found") {
-           document.getElementById("receiver-keyset").hidden = false;
            document.getElementById("receiver-exist").hidden = true;
-           document.getElementById("receiver-select").hidden = false;
            document.getElementById("receiver-keyset-fixed").value = null;
         } else {
-           document.getElementById("receiver-keyset").hidden = false;
-           document.getElementById("receiver-select").hidden = true;
            document.getElementById("receiver-exist").hidden = false;
            document.getElementById("receiver-keyset-fixed").value = JSON.stringify(res.result.data.guard, undefined, 2);
          }
        })
      }
-
-   const convertDecimal = (decimal) => {
-     decimal = decimal.toString();
-     if (decimal.includes('.')) { return decimal }
-     if ((decimal / Math.floor(decimal)) === 1) {
-       decimal = decimal + ".0"
-     }
-     return decimal
-   }
 
    const createTime = () =>  Math.round((new Date).getTime()/1000)-60;
 
@@ -642,40 +546,6 @@
      if (!(/^(?:[A-Za-z0-9+\/]{2}[A-Za-z0-9+\/]{2})*(?:[A-Za-z0-9+\/]{2}==|[A-Za-z0-9+\/]{3}=)?$/.test(s))) {
        throw new TypeError('invalid encoding');
      }
-   }
-
-   function isPriv(sig){
-     if (sig.length === 64) return true;
-     let secretKey = sig.slice(0,64);
-     let publicKey = sig.slice(64);
-     let restored = Pact.crypto.restoreKeyPairFromSecretKey(secretKey);
-     if (restored.secretKey === secretKey && restored.publicKey === publicKey) return true;
-     else return false
-   }
-
-   function validatePriv(priv){
-      try {
-        if (!Pact.crypto.restoreKeyPairFromSecretKey(priv)) {
-          return false;
-        } else {
-          let cmd = getTransferCmd();
-          let hash = decode(cmd.cmds[0].hash);
-          let sig = cmd.cmds[0].sigs[0].sig;
-          let pubKey = document.getElementById("publicKey").value;
-          try {
-            let verified = pubKey.filter(key => {
-              return nacl.sign.detached.verify(decodeBase64(hash),Pact.crypto.hexToBin(sig), Pact.crypto.hexToBin(key));
-            })
-            if (verified.length>0){
-              return true;
-            } else return false;
-          } catch {
-           return false
-          }
-        }
-       } catch {
-         return false
-       }
    }
 
    function validateSig (sig) {
@@ -745,51 +615,6 @@
      }
    }
 
-  function crossTransfer(sender, receiver, receiverKp, srcChain, targetChain, amount, fromPub, fromPriv){
-    const m = Pact.lang.mkMeta(sender, srcChain, gasPrice, xChainInitiateGasLimit, createTime(), 28800);
-    const kp = fromPub.map(pub => {
-      return {publicKey: pub, secretKey: fromPriv, clist: [{name: "coin.GAS", args: []}, {name: "coin.TRANSFER_XCHAIN", args: [sender, receiver, {"decimal": amount}, targetChain]}]}
-    })
-    let pactCode = `(coin.transfer-crosschain ${JSON.stringify(sender)} ${JSON.stringify(receiver)} (read-keyset "ks") ${JSON.stringify(targetChain)} ${convertDecimal(amount)})`;
-    if (!validateKeyset(receiverKp) && receiverKp.keysetref){
-      pactCode = `(coin.transfer-crosschain ${JSON.stringify(sender)} ${JSON.stringify(receiver)} (keyset-ref-guard ${JSON.stringify(receiverKp.keysetref)}) ${JSON.stringify(targetChain)} ${convertDecimal(amount)})`;
-    }
-
-    return Pact.simple.exec.createCommand(
-      kp,
-      JSON.stringify(new Date()),
-      pactCode,
-      {"ks": receiverKp},
-      m,
-      getNode(srcChain).networkId
-    )
-  }
-
-  function transferCreate(sender, receiver, receiverKp, fromPub, fromPriv, chainId, amount){
-    const m = Pact.lang.mkMeta(sender, chainId, gasPrice, transferGasLimit, createTime(), 28800);
-    const kp = fromPub.map(pub => {
-      return {publicKey: pub, secretKey: fromPriv, clist: [{name: "coin.GAS", args: []}, {name: "coin.TRANSFER", args: [sender, receiver, Number(amount)]}]}
-    })
-    let pactCode = `(coin.transfer-create ${JSON.stringify(sender)} ${JSON.stringify(receiver)} (read-keyset "ks") ${convertDecimal(amount)})`;
-    if (!validateKeyset(receiverKp) && receiverKp.keysetref){
-      pactCode = `(coin.transfer-create ${JSON.stringify(sender)} ${JSON.stringify(receiver)} (keyset-ref-guard ${JSON.stringify(receiverKp.keysetref)}) ${convertDecimal(amount)})`;
-    }
-    return Pact.simple.exec.createCommand(
-        kp,
-        JSON.stringify(new Date()),
-        pactCode,
-        {"ks": receiverKp},
-        m,
-        getNode(chainId).networkId
-      )
-  }
-
-  const signCmd = function(unSigned, sig){
-    let signed = Object.assign(unSigned);
-    signed.cmds[0].sigs = [{"sig": sig}]
-    return signed;
-  }
-
   const getInputs = function (){
     return {
       fromAccount: document.getElementById("fromAccount").value,
@@ -797,41 +622,8 @@
       fromPublicKey: document.getElementById("publicKey").value,
       toAccount: document.getElementById("toAccount").value,
       toChainId: document.getElementById("toChainId").value,
-      toGuard: readKeyset(),
       amount: document.getElementById("amount").value,
-      signature: document.getElementById("signature").value
     }
-  }
-
-  const getTransferCmd = function () {
-    let {fromAccount, fromChainId, fromPublicKey, toAccount, toChainId, toGuard, amount, signature} = getInputs();
-    let privKey = signature.length === 128 && isPriv(signature)
-      ? signature.slice(0,64)
-      : signature.length === 64
-        ? signature
-        : null
-    if (isCrossChain(fromChainId, toChainId)) {
-      return crossTransfer(fromAccount, toAccount, toGuard, fromChainId, toChainId, amount, fromPublicKey, privKey);
-    }
-    else return transferCreate(fromAccount, toAccount, toGuard, fromPublicKey, privKey, fromChainId, amount)
-  }
-
-  const readKeyset = function(){
-    if (document.getElementById("receiver-keyset-fixed").value) {
-      return JSON.parse(document.getElementById("receiver-keyset-fixed").value);
-    } else if(document.getElementById("basic").classList.contains( 'active' )){
-          if (document.getElementById("basicPublicKey").value.length !== 64) return null
-      else {
-        return {
-           "keys": [document.getElementById("basicPublicKey").value],
-           "pred": document.getElementById("basicPredicate").value
-        }
-      }
-    } else if (document.getElementById("custom").classList.contains( 'active' )){
-      return JSON.parse(document.getElementById("custom-guard").value)
-    } else if (document.getElementById("upload").classList.contains( 'active' )){
-      return document.getElementById("toPubFile").value
-    } else return null;
   }
 
   const openAccordion  = function (){
@@ -850,20 +642,18 @@
   }
 
   const disableFields = function(){
-    let fields = ['fromAccount','toAccount', 'receiver-select', 'amount',
-    ,'basicPublicKey','custom-guard']
+    let fields = ['fromAccount','toAccount', 'amount']
     fields.forEach(field => disable(field))
-    let dropdowns = ["predicateDropdown", "fromIdDropdown", "toIdDropdown"]
+    let dropdowns = ["fromIdDropdown", "toIdDropdown"]
     dropdowns.forEach(dropdown => {
       document.getElementById(dropdown).classList.add('disabled')
     })
   }
 
   const enableFields = function (field){
-    let fields = ['fromAccount','fromChainId','toAccount','toChainId', 'receiver-select', 'amount'
-    ,'basicPublicKey','basicPredicate','custom-guard']
+    let fields = ['fromAccount','fromChainId','toAccount','toChainId', 'amount']
     fields.forEach(field => enable(field))
-    let dropdowns = ["predicateDropdown", "fromIdDropdown", "toIdDropdown"]
+    let dropdowns = ["fromIdDropdown", "toIdDropdown"]
     dropdowns.forEach(dropdown => {
       document.getElementById(dropdown).classList.remove('disabled')
     })
@@ -878,21 +668,9 @@
     document.getElementById("cmd").value = null;
   }
 
-  const getHash = function(){
-    document.getElementById("signature").value = ""
-    let title = document.getElementById("sign-button");
-    cmd = getTransferCmd();
-    console.log("Transfer cmd", cmd);
-    document.getElementById("hash-string").innerText = "";
-    document.getElementById("cmd").value = null;
-    document.getElementById("hash-string").innerText = cmd.cmds[0].hash
-    document.getElementById("cmd").value = cmd;
-    openAccordion();
-  }
-
   const showHash = function () {
     disableFields()
-    getHash();
+    openAccordion();
   }
 
   const isCrossChain = function (from, to) {
@@ -960,7 +738,7 @@
                   </div>
                   <label>Sender</label>
                   <div class="ui right action left input">
-                    <input type="text" id="fromAccount" placeholder="Enter Account Name of the sender">
+                    <input type="text" id="fromAccount" placeholder="Will be obtained from Ledger" readonly>
                     <div id="fromIdDropdown" class="ui basic floating compact selection dropdown button chain">
                       <input type="hidden" value="0" id="fromChainId">
                       <div class="text">Chain 0</div>
@@ -1025,46 +803,6 @@
                 </div>
               <div id="receiver-keyset" class="field" hidden>
                 <label>Receiver Keyset</label>
-              <div id="receiver-select" class="content" hidden>
-                <div class="ui secondary pointing menu">
-                  <a class="item active" id="basic">
-                    Basic
-                  </a>
-                  <a class="item" id="custom">
-                    Custom
-                  </a>
-                  <!-- <a class="item" id="upload">
-                    Upload
-                  </a> -->
-                </div>
-                <div class="ui segment" id="keyset">
-                  <div id="basic-input" class="field">
-                    <label>Public Key</label>
-                    <div class="ui right action left input">
-                      <input id="basicPublicKey" type="text" placeholder="Enter Receiver Keyset">
-                      <div id="predicateDropdown" class="ui basic floating compact selection dropdown button chain">
-                        <input id="basicPredicate" type="hidden" value="keys-all" id="pred">
-                        <div class="text">keys-all</div>
-                        <i class="dropdown icon"></i>
-                          <div class="menu">
-                            <div class="item" data-value="keys-all">keys-all</div>
-                            <div class="item" data-value="keys-any">keys-any</div>
-                          </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div id="custom-input" class="field" hidden>
-                    <label>Create a Multi-Sig Keyset.</label>
-                    <textarea id="custom-guard">{"pred": "", "keys": []}</textarea>
-                  </div>
-                  <!-- <div id="upload-input" class="field" hidden>
-                    <label>Upload KDA file</label>
-                    <div>
-                      <input id="to-pub-file" type="file" class="ui primary button" onchange="toPubLoad()"/>
-                    </div>
-                  </div> -->
-                </div>
-              </div>
               <div id="receiver-exist" class="ui segment" hidden>
                 <textArea id="receiver-keyset-fixed" readonly></textArea>
               </div>
@@ -1073,7 +811,7 @@
               <label>Amount</label>
               <input type="text" id="amount" name="amount" placeholder="Enter Amount To Transfer">
             </div>
-              <div class="field">
+              <div class="field" hidden>
                   <label>Sign</label>
                     <div class="title" id="sign-button">
                     </div>
@@ -1081,11 +819,11 @@
                         <p style="font-weight:bold;" id="hash-string"></p>
                     </div>
               </div>
-              <div class="field">
-                <input type="text" id="signature" placeholder="Enter Private Key or Signature">
+              <div class="field" hidden>
+                <input type="text" id="signature" placeholder="auto-filled">
               </div>
               <div id="getSig-button" class="ui primary button">Sign with Ledger</div>
-              <div id="submit-button" class="ui submit primary button">Make Transfer</div>
+              <div id="submit-button" class="ui submit primary button disabled">Make Transfer</div>
               <div id="reset-button" class="ui button">Reset</div>
               <br/>
               <br/>
