@@ -263,6 +263,7 @@
               });
             }
           }
+          console.log("Pact command:", rv.pact_command);
           document.getElementById("cmd").value = {
             cmds: [rv.pact_command]
           };
@@ -276,6 +277,7 @@
           if (e instanceof TypeError) {
             setError("Error: " + e.message)
           } else {
+            console.log("Unknown error:", e);
             setError("Could not obtain the signature")
           }
         }
