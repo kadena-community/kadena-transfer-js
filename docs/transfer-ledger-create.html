@@ -148,10 +148,6 @@
             $("body").dimmer("hide");
        })
 
-       document.getElementById("fromAccount").addEventListener("blur", async function(e){
-         fetchSenderKeyset();
-       })
-
        document.getElementById("network-0").addEventListener("click", async function(e){
          reset();
        })
@@ -271,7 +267,7 @@
           document.getElementById("hash-string").innerText = rv.pact_command.hash;
           document.getElementById("publicKey").value = [ rv.pubkey ];
           var prefix = "k:"
-          document.getElementById("fromAccount").value = prefix.concat(rv.pubkey);
+          document.getElementById("fromAccount").innerText = prefix.concat(rv.pubkey);
           document.getElementById('submit-button').classList.remove("disabled");
         } catch (e) {
           if (e instanceof TypeError) {
@@ -307,13 +303,12 @@
         try {
           var publicKey = (await window.ledger.getPublicKey(DEFAULT_BIP32_PATH)).publicKey;
           document.getElementById("publicKey").value = [ publicKey ];
-          document.getElementById("fromAccount").value = prefix.concat(publicKey);
+          document.getElementById("fromAccount").innerText = prefix.concat(publicKey);
           window.pubKey = publicKey;
-          //let title = document.getElementById("getPubkey-button");
-          //let content = document.getElementById("getPubkey-content");
-          //title.classList.add('active')
-          //content.classList.add('active')
-          document.getElementById('submit-button').classList.add("disabled");
+          let title = document.getElementById("getPubkey-button");
+          let content = document.getElementById("getPubkey-content");
+          title.classList.add('active')
+          content.classList.add('active')
         } catch (e) {
           setError("Could not get the Ledger Account Name")
         }
@@ -480,7 +475,7 @@
 
      async function fetchSenderKeyset(){
        const chainId = document.getElementById("fromChainId").value;
-       const account = document.getElementById("fromAccount").value;
+       const account = document.getElementById("fromAccount").innerText;
        checkPublicKey(account, chainId).then(res => {
          if (!res) {}
          else if (res.result.status==="failure" && res.result.error.message.slice(0,24)==="with-read: row not found") {
@@ -619,7 +614,7 @@
 
   const getInputs = function (){
     return {
-      fromAccount: document.getElementById("fromAccount").value,
+      fromAccount: document.getElementById("fromAccount").innerText,
       fromChainId: document.getElementById("fromChainId").value,
       fromPublicKey: document.getElementById("publicKey").value,
       toAccount: document.getElementById("toAccount").value,
@@ -644,7 +639,7 @@
   }
 
   const disableFields = function(){
-    let fields = ['fromAccount','toAccount', 'amount']
+    let fields = ['toAccount', 'amount']
     fields.forEach(field => disable(field))
     let dropdowns = ["fromIdDropdown", "toIdDropdown"]
     dropdowns.forEach(dropdown => {
@@ -653,7 +648,7 @@
   }
 
   const enableFields = function (field){
-    let fields = ['fromAccount','fromChainId','toAccount','toChainId', 'amount']
+    let fields = ['fromChainId','toAccount','toChainId', 'amount']
     fields.forEach(field => enable(field))
     let dropdowns = ["fromIdDropdown", "toIdDropdown"]
     dropdowns.forEach(dropdown => {
@@ -701,6 +696,19 @@
                 account works as expected.
                 </p>
             </div>
+            <div>
+              <div class="ui accordion">
+                <div class="title" id="getPubkey-button">
+                  <i class="dropdown icon"></i>
+                  Show Ledger Account Name
+                </div>
+                <div class="content" id="getPubkey-content">
+                  <div class="ui message">
+                    <p style="font-weight:bold;" id="fromAccount"></p>
+                  </div>
+                </div>
+              </div>
+            </div>
             <form id ="kadena-form" class="ui form" autocomplete="off">
               <div class="field">
                 <label>Network</label>
@@ -727,20 +735,8 @@
                 </div>
               </div>
                 <div class="field">
-                  <div class="ui accordion">
-                    <div class="title" id="getPubkey-button">
-                      <i class="dropdown icon"></i>
-                      Show Ledger Account Name
-                    </div>
-                    <div class="content" id="getPubkey-content">
-                      <div class="ui message">
-                        <p style="font-weight:bold;" id="hash-string"></p>
-                      </div>
-                    </div>
-                  </div>
                   <label>Sender</label>
-                  <div class="ui right action left input">
-                    <input type="text" id="fromAccount" placeholder="Will be obtained from Ledger" readonly>
+                  <div class="ui right action left">
                     <div id="fromIdDropdown" class="ui basic floating compact selection dropdown button chain">
                       <input type="hidden" value="0" id="fromChainId">
                       <div class="text">Chain 0</div>
