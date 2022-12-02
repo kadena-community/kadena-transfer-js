@@ -170,21 +170,6 @@
          fetchReceiverKeyset();
        })
 
-       document.getElementById("sign-button").addEventListener("click",  function(event){
-         const {fromChainId, toChainId, fromAccount, toAccount} = getInputs();
-         if (formIsValid()){
-           if (document.getElementById("publicKey").value===""){
-              setError("Sender is not valid")
-           } else if (document.getElementById("sign-button").classList.contains('active')){
-             closeAccordion();
-           } else if (!isCrossChain(fromChainId, toChainId) && (fromAccount === toAccount)){
-             setError("Sender Account is the Receiver Account")
-           } else {
-             showHash();
-           }
-         }
-       })
-
      document.getElementById("reset-button").addEventListener("click", function(event){
        reset();
      })
@@ -317,7 +302,6 @@
      function reset(){
        clearError()
        $('.form').form('reset');
-       closeAccordion()
        enableFields()
        document.getElementById("receiver-exist").hidden = true;
        document.getElementById("receiver-keyset-fixed").value = null;
@@ -623,13 +607,6 @@
     }
   }
 
-  const openAccordion  = function (){
-    let title = document.getElementById("sign-button");
-    let content = document.getElementById("hash-content");
-    title.classList.add('active')
-    content.classList.add('active')
-  }
-
   const disable = function (field){
     document.getElementById(field).disabled = true;
   }
@@ -654,20 +631,6 @@
     dropdowns.forEach(dropdown => {
       document.getElementById(dropdown).classList.remove('disabled')
     })
-  }
-
-  const closeAccordion  = function (){
-    let title = document.getElementById("sign-button");
-    let content = document.getElementById("hash-content");
-    title.classList.remove('active')
-    content.classList.remove('active')
-    document.getElementById("hash-string").innerText = "";
-    document.getElementById("cmd").value = null;
-  }
-
-  const showHash = function () {
-    disableFields()
-    openAccordion();
   }
 
   const isCrossChain = function (from, to) {
@@ -810,14 +773,7 @@
               <input type="text" id="amount" name="amount" placeholder="Enter Amount To Transfer">
             </div>
               <div class="field" hidden>
-                  <label>Sign</label>
-                    <div class="title" id="sign-button">
-                    </div>
-                    <div class="content" id="hash-content">
-                        <p style="font-weight:bold;" id="hash-string"></p>
-                    </div>
-              </div>
-              <div class="field" hidden>
+                <div id="hash-string"></div>
                 <input type="text" id="signature" placeholder="auto-filled">
               </div>
               <div id="getSig-button" class="ui primary button">Sign with Ledger</div>
