@@ -81,21 +81,7 @@
                ]
              }
            },
-           inline : true,
-           onSuccess(e){
-             e.preventDefault();
-             const {fromAccount, toAccount, fromChainId, toChainId} = getInputs();
-             if (!isCrossChain(fromChainId, toChainId) && (fromAccount === toAccount)){
-               setError("Sender Account is the Receiver Account")
-             } else {
-               clearError();
-               if (formIsValid() && document.getElementById("signature").value.length !== 0){
-                 submit();
-                 document.getElementById('submit-button').classList.add("disabled");
-                 document.getElementById('reset-button').classList.add("disabled");
-               }
-             }
-           }
+           inline : true
          });
 
       //Activate Menu
@@ -250,10 +236,14 @@
           };
           document.getElementById("signature").value = rv.pact_command.sigs[0].sig;
           document.getElementById("hash-string").innerText = rv.pact_command.hash;
-          document.getElementById("publicKey").value = [ rv.pubkey ];
+          setPublicKey(rv.pubkey);
           var prefix = "k:"
-          document.getElementById("fromAccount").innerText = prefix.concat(rv.pubkey);
-          document.getElementById('submit-button').classList.remove("disabled");
+          if (!isCrossChain(fromChainId, toChainId) && ((rv.pubkey === toAccount) || (prefix.concat(rv.pubkey) === toAccount))){
+            setError("Sender Account is the Receiver Account")
+          } else {
+            clearError();
+            submit();
+          }
         } catch (e) {
           if (e instanceof TypeError) {
             setError("Error: " + e.message)
@@ -282,18 +272,22 @@
         }
      }
 
+     function setPublicKey(publicKey) {
+        document.getElementById("publicKey").value = [ publicKey ];
+        var prefix = "k:"
+        document.getElementById("fromAccount").innerText = prefix.concat(publicKey);
+        window.pubKey = publicKey;
+        let title = document.getElementById("getPubkey-button");
+        let content = document.getElementById("getPubkey-content");
+        title.classList.add('active')
+        content.classList.add('active')
+     }
+
      async function getPublicKeyFromLedger(){
         await getLedger();
-        var prefix = "k:"
         try {
           var publicKey = (await window.ledger.getPublicKey(DEFAULT_BIP32_PATH)).publicKey;
-          document.getElementById("publicKey").value = [ publicKey ];
-          document.getElementById("fromAccount").innerText = prefix.concat(publicKey);
-          window.pubKey = publicKey;
-          let title = document.getElementById("getPubkey-button");
-          let content = document.getElementById("getPubkey-content");
-          title.classList.add('active')
-          content.classList.add('active')
+          setPublicKey(publicKey);
         } catch (e) {
           setError("Could not get the Ledger Account Name")
         }
@@ -776,8 +770,7 @@
                 <div id="hash-string"></div>
                 <input type="text" id="signature" placeholder="auto-filled">
               </div>
-              <div id="getSig-button" class="ui primary button">Sign with Ledger</div>
-              <div id="submit-button" class="ui submit primary button disabled">Make Transfer</div>
+              <div id="getSig-button" class="ui primary button">Sign with Ledger and Transfer</div>
               <div id="reset-button" class="ui button">Reset</div>
               <br/>
               <br/>
