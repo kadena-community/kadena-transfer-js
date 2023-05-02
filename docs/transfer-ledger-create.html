@@ -134,6 +134,11 @@
             $("body").dimmer("hide");
        })
 
+        document.getElementById("verifyAddress-button").addEventListener("click", async function(e){
+          // Dont dim, let the user see the address on web
+          await verifyAddressOnLedger();
+        })
+
        document.getElementById("network-0").addEventListener("click", async function(e){
          reset();
        })
@@ -298,6 +303,16 @@
           setError("Could not get the Ledger Account Name")
         }
      }
+
+      async function verifyAddressOnLedger(){
+        await getLedger();
+        try {
+          var publicKey = bufferToHex((await window.ledger.verifyAddress(DEFAULT_BIP32_PATH)).publicKey);
+          setPublicKey(publicKey);
+        } catch (e) {
+          setError("Could not get the Ledger Account Name")
+        }
+      }
 
      function reset(){
        clearError()
@@ -668,6 +683,9 @@
                 <div class="content" id="getPubkey-content">
                   <div class="ui message">
                     <p style="font-weight:bold;" id="fromAccount"></p>
+                    <div class="ui button" id="verifyAddress-button">
+                      <span>Verify</span>
+                    </div>
                   </div>
                 </div>
               </div>
