@@ -16,6 +16,12 @@
       //Form Validation
       $(document).ready(function(){
 
+       // create 1000 entries under "ledger key"
+       const m = $('#ledger-key-menu');
+       for(let i=0; i<=1000; i++) {
+         m.append(`<div class="item" data-value="${i}">${i}</div>`);
+       }
+
        // custom form validation rule
        $.fn.form.settings.rules.validSig = function(sig) {
          return sig.length === 128 && validateSig(sig);
@@ -93,7 +99,10 @@
        });
        //Activate Dropdown
        $('.dropdown')
-         .dropdown();
+         .dropdown({ selectOnKeydown: false });
+
+       $('.popup-target')
+          .popup({ closable: false});
 
        $('.message .close')
          .on('click', function() {
@@ -101,8 +110,7 @@
              .closest('.message')
              .transition('fade')
            ;
-         })
-       ;
+         });
      });
 
      const mkReq = (cmd) => {
@@ -117,6 +125,16 @@
 
      // INITIATION FUNCTIONS
      window.addEventListener('load', function (event) {
+       let prevTimeout;
+       document.getElementById("keyIdDropdown").addEventListener("change", async function(e){
+         // debounce - when typing we sometimes get multiple triggers
+         if (prevTimeout)
+           clearTimeout(prevTimeout);
+         prevTimeout = setTimeout(() => {
+           prevTimeout = null;
+           getPublicKeyFromLedger()
+         }, 200);
+       })
        document.getElementById("getSig-button").addEventListener("click", async function(e){
             dimBody("Waiting for ledger signature");
             await signWithLedger();
@@ -129,14 +147,14 @@
        })
 
        document.getElementById("getPubkey-button").addEventListener("click", async function(e){
-            dimBody("Waiting for ledger public key");
             await getPublicKeyFromLedger();
-            $("body").dimmer("hide");
        })
 
         document.getElementById("verifyAddress-button").addEventListener("click", async function(e){
           // Dont dim, let the user see the address on web
+          setStatus('Check your ledger to confirm your address');
           await verifyAddressOnLedger();
+          setStatus('');
         })
 
        document.getElementById("network-0").addEventListener("click", async function(e){
@@ -195,7 +213,12 @@
         }
      }
 
-     const DEFAULT_BIP32_PATH = "m/44'/626'/0'/0/0";
+     const BIP32_PATH_PREFIX = "m/44'/626'/0'/0/";
+     function getPath() {
+       const {keyId} = getInputs();
+       return `${BIP32_PATH_PREFIX}${keyId}"`;
+     }
+
      async function signWithLedger(){
         clearError();
         await getLedger();
@@ -209,7 +232,7 @@
           var rv = {};
           if (isCrossChain(fromChainId, toChainId)) {
             rv = await window.ledger.signTransferCrossChainTx({
-              path: DEFAULT_BIP32_PATH,
+              path: getPath(),
               recipient: toAccount,
               recipient_chainId: toChainId,
               amount: amount,
@@ -219,7 +242,7 @@
           } else {
             if (document.getElementById("receiver-exist").hidden === false){
               rv = await window.ledger.signTransferTx({
-                path: DEFAULT_BIP32_PATH,
+                path: getPath(),
                 recipient: toAccount,
                 amount: amount,
                 chainId: fromChainId,
@@ -227,7 +250,7 @@
               });
             } else {
               rv = await window.ledger.signTransferCreateTx({
-                path: DEFAULT_BIP32_PATH,
+                path: getPath(),
                 recipient: toAccount,
                 amount: amount,
                 chainId: fromChainId,
@@ -259,14 +282,14 @@
         }
      }
 
-     async function signHashWithLedger(){
+      async function signHashWithLedger(){
         document.getElementById("blind-sig-err").hidden=true;
         document.getElementById("blind-sig-err").innerText = "";
         await getLedger();
 
         var txnHash = document.getElementById("blind-signing-hash").value
         try {
-          var signed = await window.ledger.signHash(DEFAULT_BIP32_PATH,txnHash);
+          var signed = await window.ledger.signHash(getPath(),txnHash);
           var sig = signed.signature;
           document.getElementById("signature-blind-sig").value = sig;
           document.getElementById("signature-blind-sig-field").hidden = false;
@@ -275,18 +298,27 @@
           document.getElementById("blind-sig-err").hidden=false;
           document.getElementById("blind-sig-err").innerText = "An error occurred while trying to do blind signing. Please make sure the 'Blind Signing' feature is enabled on the Kadena Ledger App";
         }
-     }
+      }
 
-     function setPublicKey(publicKey) {
+      function setStatus(status) {
+        const elem = document.getElementById("status");
+        if (status) {
+          elem.innerText = status;
+          elem.style.display = 'block';
+        } else {
+          elem.style.display = 'none';
+        }
+      }
+
+      function setPublicKey(publicKey) {
         document.getElementById("publicKey").value = [ publicKey ];
-        var prefix = "k:"
-        document.getElementById("fromAccount").innerText = prefix.concat(publicKey);
+        document.getElementById("fromAccount").innerText = publicKey ? `k:${publicKey}` : '';
         window.pubKey = publicKey;
         let title = document.getElementById("getPubkey-button");
         let content = document.getElementById("getPubkey-content");
         title.classList.add('active')
         content.classList.add('active')
-     }
+      }
 
       function bufferToHex (buffer) {
         return [...new Uint8Array (buffer)]
@@ -294,23 +326,31 @@
           .join ("");
       }
 
-     async function getPublicKeyFromLedger(){
+      async function getPublicKeyFromLedger(){
+        dimBody("Waiting for ledger public key");
+        setPublicKey('');
+        setStatus('Loading');
         await getLedger();
         try {
-          var publicKey = bufferToHex((await window.ledger.getPublicKey(DEFAULT_BIP32_PATH)).publicKey);
+          var publicKey = bufferToHex((await window.ledger.getPublicKey(getPath())).publicKey);
           setPublicKey(publicKey);
+          setStatus();
         } catch (e) {
-          setError("Could not get the Ledger Account Name")
+          setStatus('Error: '+e.message);
+          setError("Could not get the Ledger Account Name " + e.message)
         }
-     }
+        $("body").dimmer("hide");
+      }
 
       async function verifyAddressOnLedger(){
         await getLedger();
         try {
-          var publicKey = bufferToHex((await window.ledger.verifyAddress(DEFAULT_BIP32_PATH)).publicKey);
+          var path = getPath();
+          var publicKey = bufferToHex((await window.ledger.verifyAddress(path)).publicKey);
           setPublicKey(publicKey);
         } catch (e) {
-          setError("Could not get the Ledger Account Name")
+          console.error(e);
+          setError("Could not get the Ledger Account Name "+e.message);
         }
       }
 
@@ -613,6 +653,7 @@
 
   const getInputs = function (){
     return {
+      keyId: document.getElementById("keyId").value,
       fromAccount: document.getElementById("fromAccount").innerText,
       fromChainId: document.getElementById("fromChainId").value,
       fromPublicKey: document.getElementById("publicKey").value,
@@ -633,7 +674,7 @@
   const disableFields = function(){
     let fields = ['toAccount', 'amount']
     fields.forEach(field => disable(field))
-    let dropdowns = ["fromIdDropdown", "toIdDropdown"]
+    let dropdowns = ["keyIdDropdown", "fromIdDropdown", "toIdDropdown"]
     dropdowns.forEach(dropdown => {
       document.getElementById(dropdown).classList.add('disabled')
     })
@@ -642,7 +683,7 @@
   const enableFields = function (field){
     let fields = ['fromChainId','toAccount','toChainId', 'amount']
     fields.forEach(field => enable(field))
-    let dropdowns = ["fromIdDropdown", "toIdDropdown"]
+    let dropdowns = ["keyIdDropdown", "fromIdDropdown", "toIdDropdown"]
     dropdowns.forEach(dropdown => {
       document.getElementById(dropdown).classList.remove('disabled')
     })
@@ -667,7 +708,7 @@
                     Caution
                 </div>
                 <p>
-                Blockchain transactions are <b>irreversable</b>. If you make a mistake,
+                Blockchain transactions are <b>irreversible</b>. If you make a mistake,
                 your coins <b>may not be recoverable</b>. Before you transfer large sums,
                 it is always best to do a small test transaction first and then
                 send those coins back to the sender to verify that the receiver's
@@ -678,12 +719,26 @@
               <div class="ui accordion">
                 <div class="title" id="getPubkey-button">
                   <i class="dropdown icon"></i>
-                  Show Ledger Account Name
+                  Change/Verify Ledger Account Name
                 </div>
                 <div class="content" id="getPubkey-content">
-                  <div class="ui message">
+                  <div class="ui message" style="margin-bottom:10px">
+                    <div>
+                      <div id="keyIdDropdown" class="ui floating small dropdown labeled search icon button">
+                        <input type="hidden" id="keyId" value="0" />
+                        <i class="key icon"></i>
+                        <div class="text">0</div>
+                        <div class="menu" id="ledger-key-menu">
+                        </div>
+                      </div>
+                      <i style="margin-right: -20px; margin-left: 5px" class="info icon small popup-target" data-content="Change ledger key. If unsure, leave the default (zero)."></i>
+                    </div>
+
                     <p style="font-weight:bold;" id="fromAccount"></p>
+                    <p style="font-weight:bold;" id="status"></p>
+
                     <div class="ui button" id="verifyAddress-button">
+                      <i class="eye icon"></i>
                       <span>Verify</span>
                     </div>
                   </div>
@@ -825,8 +880,9 @@
                  Warning
               </div>
               <p>
-              Transaction hash signing (Blind Signing) feature is intended only for advanced users.
-              Please ensure that the 'Blind Signing' is enabled on the Kadena Ledger App.
+                <b>Signing hashes from untrusted sources can lead to loss of funds.</b><br />
+                Transaction hash signing (Blind Signing) feature is intended only for advanced users.<br/>
+                This function requires 'Blind Signing' to be enabled on the Kadena Ledger App.
               </p>
           </div>
           <form id ="kadena-blind-sign-form" class="ui form" autocomplete="off">
@@ -863,6 +919,14 @@
   a:hover {
    cursor:pointer;
   }
-
+  .ui.dimmer {
+     background-color: rgba(0,0,0,.50);
+  }
+  .ui.dimmer .content {
+     background-color: rgba(0,0,0,.9);
+     padding: 7px;
+     padding-left: 10px;
+     padding-right: 10px;
+  }
 </style>
 </html>
