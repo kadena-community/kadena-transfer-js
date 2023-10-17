@@ -1,0 +1,753 @@
+<html>
+<head>
+    <title>Kadena Transfer Tool</title>
+    <link rel="icon" href="https://explorer.chainweb.com/static/img/favicon/0d63dkd822sxczcy51lbhqgflzdxw6lhgf88x2j7kc55hcpk120y-favicon-96x96.png">
+    <script src="https://code.jquery.com/jquery-3.1.1.min.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pact-lang-api@4.1.2/pact-lang-api-global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
+    <script src="../util/ledger-os.js"></script>
+    <script src="../util/httptransp.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <script>
+
+      //Form Validation
+      $(document).ready(function(){
+
+        // create 1000 entries under "ledger key"
+        const m = $('#ledger-key-menu');
+        for(let i=0; i<=1000; i++) {
+          m.append(`<div class="item" data-value="${i}">${i}</div>`);
+        }
+
+        // custom form validation rule
+        $.fn.form.settings.rules.validSig = function(sig) {
+          return sig.length === 128 && validateSig(sig);
+        };
+
+        $.fn.form.settings.rules.checkKeyset = function(keyset) {
+          if (document.getElementById("receiver-exist").hidden === false){
+            keyset = JSON.parse(keyset)
+            if (validateKeyset(keyset)) return true;
+            else if (!!keyset.keysetref) return true;
+            else return false;
+          } else return true;
+        }
+
+        $('#kadena-form')
+          .form({
+            on: 'blur',
+            fields: {
+              server: {
+                identifier  : 'server',
+                rules: [
+                  {
+                    type   : 'empty',
+                    prompt : 'Please enter a node server'
+                  }
+                ]
+              },
+              signature: {
+                identifier  : 'signature',
+                rules: [
+                  {
+                    type   : 'validSig',
+                    prompt : 'Signature is invalid. Please check again'
+                  }
+                ]
+              },
+              toAccount: {
+                identifier  : 'toAccount',
+                rules: [
+                  {
+                    type   : 'maxLength[66]',
+                  },
+                  {
+                    type   : 'minLength[64]',
+                  }
+                ]
+              },
+              existingGuard: {
+                identifier : 'receiver-keyset-fixed',
+                rules : [
+                  {
+                    type: 'checkKeyset',
+                    prompt: 'Transferring to the receiver is not supported.'
+                  }
+                ]
+              },
+              amount: {
+                identifier  : 'amount',
+                rules: [
+                  {
+                    type   : 'decimal[<0]',
+                  }
+                ]
+              }
+            },
+            inline : true
+          });
+
+        //Activate Menu
+        $('.ui.secondary.pointing.menu').on('click', ".item", function(e) {
+          $('.ui .item').removeClass('active');
+          $(this).addClass('active');
+          $(`.ui .segment .field`).attr("hidden", true)
+          $(`.ui .segment #${e.target.id}-input`).attr("hidden", false)
+        });
+        //Activate Dropdown
+        $('.dropdown')
+          .dropdown({ selectOnKeydown: false });
+
+        $('.popup-target')
+          .popup({ closable: false});
+
+        $('.message .close')
+          .on('click', function() {
+            $(this)
+              .closest('.message')
+              .transition('fade')
+            ;
+          });
+      });
+
+      const mkReq = (cmd) => {
+        return {
+          headers: {
+"Content-Type": "application/json"
+          },
+          method: "POST",
+          body: JSON.stringify(cmd)
+        };
+      };
+
+      // INITIATION FUNCTIONS
+      window.addEventListener('load', function (event) {
+        let prevTimeout;
+        document.getElementById("keyIdDropdown").addEventListener("change", async function(e){
+          // debounce - when typing we sometimes get multiple triggers
+          if (prevTimeout)
+            clearTimeout(prevTimeout);
+          prevTimeout = setTimeout(() => {
+            prevTimeout = null;
+            getPublicKeyFromLedger()
+          }, 200);
+        })
+        document.getElementById("getSig-button").addEventListener("click", async function(e){
+          if (!window.pubKey) {
+            await getPublicKeyFromLedger();
+          }
+          if (window.pubKey) {
+            dimBody("Waiting for ledger signature");
+            await signWithLedger();
+            $("body").dimmer("hide");
+          }
+        })
+        document.getElementById("getPubkey-button").addEventListener("click", async function(e){
+          await getPublicKeyFromLedger();
+        })
+
+        document.getElementById("verifyAddress-button").addEventListener("click", async function(e){
+          // Dont dim, let the user see the address on web
+          setStatus('Check your ledger to confirm your address');
+          await verifyAddressOnLedger();
+          setStatus('');
+        })
+
+        document.getElementById("reset-button").addEventListener("click", function(event){
+          reset();
+        })
+
+        const copyButton = document.getElementById("copy-button");
+        copyButton.addEventListener("click", function(event){
+          const sig = document.getElementById('signature').value;
+          navigator.clipboard.writeText(sig);
+          copyButton.classList.add('positive');
+          const icon = document.getElementById('copy-icon');
+          icon.classList.remove('copy');
+          icon.classList.add('checkmark');
+          setTimeout(() => {
+            copyButton.classList.remove('positive');
+            icon.classList.add('copy');
+            icon.classList.remove('checkmark');
+          }, 1500);
+          return false;
+        })
+
+      });
+
+      const localGasLimit = 1000
+      const transferGasLimit = 2300;
+      const xChainInitiateGasLimit = 1800;
+      const xChainFinishGasLimit = 750;
+      const xChainFinishGasPrice = 0.00000001;
+      const gasPrice = 0.00001;
+
+      function formIsValid(){
+        return $('.form').form('is valid');
+      }
+
+      function dimBody(msg){
+        $("body").dimmer({closable:true}).dimmer("show");
+        $(".dimmer").html("<div class='content'> <h3> " + msg + "</h3></div>");
+      }
+
+      async function getLedger(){
+        if (!window.ledger) {
+          var transp = await window.TranspWeb.create();
+          window.ledger = new window.Kadena(transp);
+        }
+      }
+
+      const BIP32_PATH_PREFIX = "m/44'/626'/0'/0/";
+      function getPath() {
+        const {keyId} = getInputs();
+        return `${BIP32_PATH_PREFIX}${keyId}"`;
+      }
+
+      async function signWithLedger(){
+        clearError();
+        await getLedger();
+
+        let {json} = getInputs();
+        try {
+          const path = getPath();
+          const txn = JSON.parse(json);
+          // TODO ? check sigs for out current key requirement
+          const bufferCmd = new TextEncoder().encode(txn.cmd);
+          const { signature } = await window.ledger.signTransaction(path, bufferCmd);
+          const hexSignature = signature.toString('hex');
+          document.getElementById("signature").value = hexSignature;
+          document.getElementById('getSig-button').classList.add('disabled');
+          document.getElementById('getSig-button').innerText = 'Signed';
+          document.getElementById('copy-button').classList.remove('disabled');
+          document.getElementById('signature').scrollIntoView();
+        } catch (e) {
+          if (e instanceof TypeError) {
+            setError("Error: " + e.message)
+          } else {
+            console.log("Unknown error:", e);
+            setError("Could not obtain the signature")
+          }
+        }
+      }
+
+      async function signHashWithLedger(){
+        document.getElementById("blind-sig-err").hidden=true;
+        document.getElementById("blind-sig-err").innerText = "";
+        await getLedger();
+
+        var txnHash = document.getElementById("blind-signing-hash").value
+        try {
+          var signed = await window.ledger.signHash(getPath(),txnHash);
+          var sig = signed.signature;
+          document.getElementById("signature-blind-sig").value = sig;
+          document.getElementById("signature-blind-sig-field").hidden = false;
+        } catch (e) {
+          document.getElementById("kadena-blind-sign-form").classList.add("error")
+          document.getElementById("blind-sig-err").hidden=false;
+          document.getElementById("blind-sig-err").innerText = "An error occurred while trying to do blind signing. Please make sure the 'Blind Signing' feature is enabled on the Kadena Ledger App";
+        }
+      }
+
+      function setStatus(status) {
+        const elem = document.getElementById("status");
+        if (status) {
+          elem.innerText = status;
+          elem.style.display = 'block';
+        } else {
+          elem.style.display = 'none';
+        }
+      }
+
+      function setPublicKey(publicKey) {
+        document.getElementById("publicKey").value = [ publicKey ];
+        document.getElementById("fromAccount").innerText = publicKey ? `k:${publicKey}` : '';
+        window.pubKey = publicKey;
+        let title = document.getElementById("getPubkey-button");
+        let content = document.getElementById("getPubkey-content");
+        title.classList.add('active')
+        content.classList.add('active')
+      }
+
+      function bufferToHex (buffer) {
+        return [...new Uint8Array (buffer)]
+          .map (b => b.toString (16).padStart (2, "0"))
+          .join ("");
+      }
+
+      async function getPublicKeyFromLedger(){
+        dimBody("Waiting for ledger public key");
+        setPublicKey('');
+        setStatus('Loading');
+        await getLedger();
+        try {
+          var publicKey = bufferToHex((await window.ledger.getPublicKey(getPath())).publicKey);
+          setPublicKey(publicKey);
+          setStatus();
+        } catch (e) {
+          setStatus('Error: '+e.message);
+          console.error(e);
+          setError("Could not get the Ledger Account Name " + e.message)
+        }
+        $("body").dimmer("hide");
+      }
+
+      async function verifyAddressOnLedger(){
+        await getLedger();
+        try {
+          var path = getPath();
+          var publicKey = bufferToHex((await window.ledger.verifyAddress(path)).publicKey);
+          setPublicKey(publicKey);
+        } catch (e) {
+          console.error(e);
+          setError("Could not get the Ledger Account Name "+e.message);
+        }
+      }
+
+      function reset(){
+        clearError();
+        $('.form').form('reset');
+        enableFields()
+        document.getElementById('getSig-button').classList.remove('disabled');
+        document.getElementById('getSig-button').innerText = 'Sign with Ledger';
+      }
+
+      function showXWarning(){
+        let bool;
+        let {fromChainId, toChainId} = getInputs();
+        bool = isCrossChain(fromChainId, toChainId);
+        if (bool){
+          document.getElementById('xchain-box').classList.remove("hidden")
+          document.getElementById("x-header").innerHTML = "You're about to make a Cross Chain Transfer.";
+          document.getElementById("x-message").innerHTML = "This process will take about 4 minutes, and may result in an unfinished transaction depending on network error or the state of gas station. Please keep the requestKey for further processing wait until the transaction finishes.";
+        }
+        else {
+          document.getElementById("xchain-box").classList.add("hidden");
+          document.getElementById("x-header").innerHTML = "";
+          document.getElementById("x-message").innerHTML = "";
+        }
+      }
+
+      function getNode(chainId) {
+        let apiHost = (node, networkId, chainId) => `https://${node}/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
+        if (document.getElementById("network").innerText === "Mainnet") {
+          return {
+            host : apiHost("api.chainweb.com", "mainnet01", chainId),
+            networkId: "mainnet01"
+          }
+        } else if (document.getElementById("network").innerText === "Testnet") {
+          return {
+            host : apiHost("api.testnet.chainweb.com", "testnet04", chainId),
+            networkId: "testnet04"
+          }
+        } else {
+          console.log(JSON.stringify(document.getElementById("network").innerText))
+        }
+      }
+
+      function getNetwork() {
+        if (document.getElementById("network").innerText === "Mainnet") {
+          return "mainnet";
+        } else if (document.getElementById("network").innerText === "Testnet") {
+          return "testnet";
+        } else {
+          console.log(JSON.stringify(document.getElementById("network").innerText))
+        }
+      }
+
+      async function wait(ms = 1000) {
+        return new Promise(resolve => {
+          setTimeout(resolve, ms);
+        });
+      }
+
+      async function submit() {
+        clearError();
+        let cmd = document.getElementById("cmd").value
+
+        let apiHost = getNode(document.getElementById("fromChainId").value).host
+        let targetHost = getNode(document.getElementById("toChainId").value).host
+        let networkId=getNode(document.getElementById("toChainId").value).networkId
+        const txRes = await fetch(`${apiHost}/api/v1/send`, mkReq(cmd))
+
+        document.getElementById('status-box').classList.remove("hidden")
+        //Fetch succeeded
+        if (txRes.ok) {
+          let res = await txRes.json();
+          document.getElementById('status-lookup').hidden = true;
+          document.getElementById('status-header').innerHTML = "Waiting for response...";
+          document.getElementById('status-message').innerText = JSON.stringify(res.requestKeys[0]);
+          fetch(`${apiHost}/api/v1/listen`, mkReq({"listen": res.requestKeys[0]}))
+            .then(res =>{
+              return res.json()
+            })
+            .then(async res => {
+              if (res.result.status==="failure"){
+                document.getElementById('status-header').innerHTML = "Transfer Failed";
+                document.getElementById('status-message').innerText = JSON.stringify(res.result.error);
+                document.getElementById('status-lookup').hidden = false;
+                document.getElementById('status-link').innerText = res.reqKey;
+                document.getElementById('status-link').href = getLink(res.reqKey);
+              } else {
+                //Check if crosschain
+                if (res.continuation){
+                  //send proof
+
+                  const pactId = res.continuation.pactId;
+                  document.getElementById('status-message').innerHTML ="Initiated from the Source Chain: " + "<br />" +  JSON.stringify(pactId) + "<br />" + "<br />" + "Waiting for Proof...";
+                  const targetChainId = res.continuation.yield.provenance.targetChainId;
+                  const spvCmd = {"targetChainId": targetChainId, "requestKey": pactId };
+                  let proof;
+                  while (!proof){
+                    await wait(2500);
+                    const res = await fetch(`${apiHost}/spv`, mkReq(spvCmd));
+                    let foo = await res;
+                    if (foo.ok){
+                      proof = await res.json();
+                    }
+                  }
+                  const m = Pact.lang.mkMeta("kadena-xchain-gas", targetChainId, xChainFinishGasPrice, xChainFinishGasLimit, createTime(), 28800);
+                  const contCmd = {type: "cont", keyPairs:[],pactId: pactId, rollback: false, step: 1, meta: m, proof: proof, networkId: networkId}
+                  const cmd = Pact.simple.cont.createCommand( contCmd.keyPairs, contCmd.nonce, contCmd.step, contCmd.pactId,
+                    contCmd.rollback, contCmd.envData, contCmd.meta, contCmd.proof, contCmd.networkId);
+                  fetch(`${targetHost}/api/v1/send`, mkReq(cmd))
+                    .then(async txRes => {
+                      if (txRes.ok) {
+                        let res = await txRes.json();
+                        document.getElementById('status-lookup').hidden = true;
+                        document.getElementById('status-header').innerHTML = "Waiting for response...";
+                        document.getElementById('status-message').innerHTML ="Initiated from the Source Chain: " + "<br />" +  JSON.stringify(pactId) + "<br />" + "<br />" + "Receiving from the Target Chain: " + "<br />" + JSON.stringify(res.requestKeys[0]);
+                        fetch(`${targetHost}/api/v1/listen`, mkReq({"listen": res.requestKeys[0]}))
+                          .then(res =>{
+                            return res.json();
+                          })
+                          .then(async res => {
+                            if (res.result.status==="failure"){
+                              document.getElementById('status-header').innerHTML = "Transfer Failed";
+                              document.getElementById('status-message').innerText = JSON.stringify(res.result.error);
+                              document.getElementById('status-lookup').hidden = false;
+                              document.getElementById('status-link').innerText = res.reqKey;
+                              document.getElementById('status-link').href = getLink(res.reqKey);
+                            } else {
+                              document.getElementById('status-header').innerHTML = "Transfer Succeeded";
+                              document.getElementById('status-message').innerText = JSON.stringify(res.result.data);
+                              document.getElementById('status-lookup').hidden = false;
+                              document.getElementById('status-link').innerText = res.reqKey;
+                              document.getElementById('status-link').href = getLink(res.reqKey);
+                            }
+                          })
+                      } else {
+                        let res = await txRes.text();
+                        document.getElementById('status-header').innerHTML = "Request Failed.";
+                        document.getElementById('status-message').innerText = res;
+                        document.getElementById('status-lookup').hidden = true;
+                      }})
+                } else {
+                  document.getElementById('status-header').innerHTML = "Transfer Succeeded."
+                  document.getElementById('status-message').innerText = JSON.stringify(res.result.data);
+                  document.getElementById('status-lookup').hidden = false;
+                  document.getElementById('status-link').innerText = res.reqKey;
+                  document.getElementById('status-link').href = getLink(res.reqKey);
+                }
+              }
+            })
+        } else {
+          let res = await txRes.text();
+          document.getElementById('status-header').innerHTML = "Request Failed";
+          document.getElementById('status-message').innerText = res;
+          document.getElementById('status-lookup').hidden = true;
+        }
+        return (false);
+      };
+
+      let getLink = (reqKey) => `https://explorer.chainweb.com/${getNetwork()}/tx/${reqKey}`;
+
+      async function fetchSenderKeyset(){
+        const chainId = document.getElementById("fromChainId").value;
+        const account = document.getElementById("fromAccount").innerText;
+        checkPublicKey(account, chainId).then(res => {
+          if (!res) {}
+          else if (res.result.status==="failure" && res.result.error.message.slice(0,24)==="with-read: row not found") {
+            document.getElementById("publicKey").value = ""
+            setError("Sender does not exist")
+          } else {
+            if (res.result.data.guard.keysetref) {
+              getKeysetRef(res.result.data.guard.keysetref, getNode(chainId).host).then(resKeyset => {
+                let publicKey = resKeyset.result.data.keys
+                document.getElementById("publicKey").value = publicKey
+                clearError();
+              });
+            } else if (res.result.data.guard.keys){
+              let publicKey = res.result.data.guard.keys
+              document.getElementById("publicKey").value = publicKey
+              clearError();
+            } else {
+              setError("Account Guard of the sender is not conventional. Please use a different tool.")
+            }
+          }
+        })
+      }
+
+      async function fetchReceiverKeyset(){
+        const chainId = document.getElementById("toChainId").value;
+        const account = document.getElementById("toAccount").value;
+        checkPublicKey(account, chainId).then(res => {
+          if (!res) {}
+          else if (res.result.status==="failure" && res.result.error.message.slice(0,24)==="with-read: row not found") {
+            document.getElementById("receiver-exist").hidden = true;
+            document.getElementById("receiver-keyset-fixed").value = null;
+          } else {
+            document.getElementById("receiver-exist").hidden = false;
+            document.getElementById("receiver-keyset-fixed").value = JSON.stringify(res.result.data.guard, undefined, 2);
+          }
+        })
+      }
+
+      const createTime = () =>  Math.round((new Date).getTime()/1000)-60;
+
+      function setError(msg) {
+        document.getElementById("kadena-form").classList.add("error")
+        document.getElementById("acct-err").hidden=false;
+        document.getElementById("acct-err").innerText = msg;
+      }
+
+      function clearError (){
+        document.getElementById("kadena-form").classList.remove("error")
+        document.getElementById("acct-err").hidden=true;
+        document.getElementById("acct-err").innerText = "";
+      }
+
+      var decodeBase64 = function(s) {
+        validateBase64(s);
+        var i, d = atob(s), b = new Uint8Array(d.length);
+        for (i = 0; i < d.length; i++) b[i] = d.charCodeAt(i);
+        return b;
+      };
+
+      function decode(s) {
+        return  s.replace(/-/g, '+')
+          .replace(/_/g, '/')+"=";
+      }
+      function validateBase64(s) {
+        if (!(/^(?:[A-Za-z0-9+\/]{2}[A-Za-z0-9+\/]{2})*(?:[A-Za-z0-9+\/]{2}==|[A-Za-z0-9+\/]{3}=)?$/.test(s))) {
+          throw new TypeError('invalid encoding');
+        }
+      }
+
+      function validateSig (sig) {
+        let hash = document.getElementById("hash-string").innerText;
+        hash = decode(hash)
+        let pubKey = document.getElementById("publicKey").value;
+        try{
+          let verified = pubKey.filter(key => {
+            return nacl.sign.detached.verify(decodeBase64(hash),Pact.crypto.hexToBin(sig), Pact.crypto.hexToBin(key));
+          })
+          if (verified.length>0){
+            return true;
+          } else return false;
+        } catch(e){
+          return false;
+        }
+      }
+
+      async function getAccountDetails(account, node){
+        if (account.length>=3){
+          try {
+            const m = Pact.lang.mkMeta("", "", gasPrice, localGasLimit, createTime(), 28800);
+            const tx = await Pact.fetch.local({
+              pactCode: `(coin.details ${JSON.stringify(account)})`,
+              meta: m
+            }, node)
+            return tx;
+          } catch(e){
+            throw(e)
+          }
+        } else{
+          return false;
+        }
+      }
+
+      async function getKeysetRef(keyset, node){
+        try {
+          const m = Pact.lang.mkMeta("", "", gasPrice, localGasLimit, createTime(), 28800);
+          const tx = await Pact.fetch.local({
+            pactCode: `(describe-keyset ${JSON.stringify(keyset)})`,
+            meta: m
+          }, node)
+          return tx;
+        } catch(e){
+          throw(e)
+        }
+      }
+
+      async function checkPublicKey (account, chainId) {
+        let node = getNode(chainId).host;
+        return getAccountDetails(account, node);
+      }
+
+      function validateKeyset (keyset){
+        try {
+          const {pred, keys} = keyset;
+          let preds = [
+            "keys-all",
+            "keys-any",
+            "keys-2"
+          ]
+          let validKeys = keys.filter(keys=> keys.length===64).length === keys.length;
+          let validPred = preds.includes(pred);
+          return validKeys && validPred;
+        } catch {
+          return false;
+        }
+      }
+
+      const getInputs = function (){
+        return {
+          keyId: document.getElementById("keyId").value,
+          json: document.getElementById("json").value,
+        }
+      }
+
+      const disable = function (field){
+        document.getElementById(field).disabled = true;
+      }
+
+      const enable = function (field){
+        document.getElementById(field).disabled = false;
+      }
+
+      const disableFields = function(){
+        let fields = ['json'];
+        fields.forEach(field => disable(field))
+      }
+
+      const enableFields = function (field){
+        let fields = ['json'];
+        fields.forEach(field => enable(field))
+      }
+
+      const isCrossChain = function (from, to) {
+        if (from!== to){
+          return true;
+        } else return false;
+      }
+
+</script>
+</head>
+<body>
+  <div id="main">
+    <div class="ui container">
+      <img src="https://explorer.chainweb.com/static/1lv9xhxyhlqc262kffl55w08ms1cvxsnrv49zhvm0b799dsi0v0i-kadena-k-logo.png" class="center" style="height:70px">
+      <h1>Kadena Sign JSON with Ledger</h1>
+      <div id="kadena-warning" class="ui warning message">
+        <i class="close icon"></i>
+        <div class="header">
+          Caution
+        </div>
+        <p>
+          Blockchain transactions are <b>irreversible</b>. If you make a mistake,
+          your coins <b>may not be recoverable</b>. Before you transfer large sums,
+          it is always best to do a small test transaction first and then
+          send those coins back to the sender to verify that the receiver's
+          account works as expected.
+        </p>
+      </div>
+      <div>
+        <div class="ui accordion">
+          <div class="title" id="getPubkey-button">
+            <i class="dropdown icon"></i>
+            Change/Verify Ledger Account Name
+          </div>
+          <div class="content" id="getPubkey-content">
+            <div class="ui message" style="margin-bottom:10px">
+              <div>
+                <div id="keyIdDropdown" class="ui floating small dropdown labeled search icon button">
+                  <input type="hidden" id="keyId" value="0" />
+                  <i class="key icon"></i>
+                  <div class="text">0</div>
+                  <div class="menu" id="ledger-key-menu">
+                  </div>
+                </div>
+                <i style="margin-right: -20px; margin-left: 5px" class="info icon small popup-target" data-content="Change ledger key. If unsure, leave the default (zero)."></i>
+              </div>
+
+              <p style="font-weight:bold;" id="fromAccount"></p>
+              <p style="font-weight:bold;" id="status"></p>
+
+              <div class="ui button" id="verifyAddress-button">
+                <i class="eye icon"></i>
+                <span>Verify</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <form id ="kadena-form" class="ui form" autocomplete="off">
+        You can use this form to sign JSON encoded transactions using your Ledger.
+        <div class="field">
+          <textarea placeholder="JSON encoded transaction goes here" rows="10" id="json"></textarea>
+        </div>
+        <div id="getSig-button" class="ui primary button">Sign with Ledger</div>
+        <div id="reset-button" class="ui button">Reset</div>
+        <br/>
+        <br/>
+        <div id="acct-err" class="ui center error message" hidden></div>
+        <div class="field">
+          <div class="ui action input">
+            <input type="text" class="disabled" disabled placeholder="Signature" id="signature" />
+            <button type="button" id="copy-button" class="ui disabled right icon button">
+              <i id="copy-icon" class="copy icon"></i>
+            </button>
+          </div>
+
+        </div>
+        <div id="cmd"></div>
+        <div id="xchain-box" class="ui compact message hidden" hidden>
+          <div class="header" id="x-header"> </div>
+          <p class="header" id="x-message"></p>
+        </div>
+        <div id="status-box" class="ui compact message result hidden">
+          <div class="header" id="status-header"></div>
+          <p id="status-message"></p>
+          <p id="status-lookup">Check your transaction: <br/><a id="status-link"/></a></p>
+        </div>
+        <br/>
+        <div type="text" id="publicKey" hidden />
+        </div>
+      </form>
+
+    </div>
+</body>
+<style>
+.container {
+  margin-top: 40px;
+  text-align: center;
+}
+
+#kadena-form {
+  margin: auto;
+  text-align: center;
+  max-width: 640px;
+}
+#kadena-blind-sign-form {
+  margin: auto;
+  text-align: center;
+  width: 400px;
+}
+a:hover {
+  cursor:pointer;
+}
+.ui.dimmer {
+  background-color: rgba(0,0,0,.50);
+}
+.ui.dimmer .content {
+  background-color: rgba(0,0,0,.9);
+  padding: 7px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+</style>
+</html>
