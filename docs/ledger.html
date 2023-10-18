@@ -46,18 +46,13 @@
     <div id="main">
       <div class="container">
           <img src="https://explorer.chainweb.com/static/1lv9xhxyhlqc262kffl55w08ms1cvxsnrv49zhvm0b799dsi0v0i-kadena-k-logo.png" class="center" style="height:70px">
-          <h1>Kadena Coin Transfer</h1>
-          <div>
-            <a href="transfer-create.html"><button id="submit-button" class="ui primary button">Transfer</button></a>
-            <a href="ledger.html"><button id="transfer-button" class="ui primary button">Ledger Tools</button></a>
-            <a href="xchain.html">
-              <button id="xchain-button" class="ui primary button">Finish Cross Chain Transfer</button>
-            </a>
-          </div>
-          <div style="margin-top:10px;">
-            <a href="https://balance.chainweb.com"><button class="ui primary button">Check Account Balance</button></a>
-            <button id="gen-button" class="ui primary button">Generate KeyPair (saves to file)</button>
-            <!-- <a href="address.html"><button id="submit-button" class="ui primary button">Generate Kadena Address</button></a> -->
+          <h1>Kadena Ledger Tools</h1>
+          <div style="display: flex; justify-content: center">
+            <div style="display: flex; flex-direction: column; width: fit-content" class="buttons">
+              <a href="transfer-ledger-create.html"><button id="submit-button" class="ui primary button">Simple Transfer</button></a>
+              <a href="sign-ledger-json.html"><button id="transfer-button" class="ui primary button">Sign Transactions</button></a>
+              <a href="ledger-keys.html"><button id="xchain-button" class="ui primary button">Inspect Ledger Keys</button></a>
+            </div>
           </div>
     </div>
 </body>
@@ -69,6 +64,10 @@
 }
 .field {
   margin-bottom: 20px;
+}
+.buttons button {
+  width: 100%;
+  margin-bottom: 4px !important;
 }
 </style>
 </html>

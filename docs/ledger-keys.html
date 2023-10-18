@@ -1,0 +1,493 @@
+<html>
+<head>
+    <title>Kadena Transfer Tool</title>
+    <link rel="icon" href="https://explorer.chainweb.com/static/img/favicon/0d63dkd822sxczcy51lbhqgflzdxw6lhgf88x2j7kc55hcpk120y-favicon-96x96.png">
+    <script src="https://code.jquery.com/jquery-3.1.1.min.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.js"></script>
+    <script src="../util/ledger-os.js"></script>
+    <script src="../util/httptransp.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <script>
+
+      //Form Validation
+      $(document).ready(function(){
+
+        // create 1000 entries under "ledger key"
+        const m = $('#ledger-key-menu');
+        for(let i=0; i<=1000; i++) {
+          m.append(`<div class="item" data-value="${i}">${i}</div>`);
+        }
+
+        //Activate Ledger Dropdown
+        $('.dropdown')
+          .dropdown({ selectOnKeydown: false });
+
+        $('.popup-target')
+          .popup({ closable: false});
+
+        $('.message .close')
+          .on('click', function() {
+            $(this)
+              .closest('.message')
+              .transition('fade')
+            ;
+          });
+      });
+
+      const mkReq = (cmd) => {
+        return {
+          headers: {
+"Content-Type": "application/json"
+          },
+          method: "POST",
+          body: JSON.stringify(cmd)
+        };
+      };
+
+      // INITIATION FUNCTIONS
+      window.addEventListener('load', function (event) {
+        let prevTimeout;
+        document.getElementById("keyIdDropdown").addEventListener("change", async function(e){
+          // debounce - when typing we sometimes get multiple triggers
+          if (prevTimeout)
+            clearTimeout(prevTimeout);
+          prevTimeout = setTimeout(() => {
+            prevTimeout = null;
+            getPublicKeyFromLedger()
+          }, 200);
+        })
+        document.getElementById("getSig-button").addEventListener("click", async function(e){
+          if (!window.pubKey) {
+            await getPublicKeyFromLedger();
+          }
+          if (window.pubKey) {
+            dimBody("Waiting for ledger signature");
+            await signWithLedger();
+            $("body").dimmer("hide");
+          }
+        });
+        document.getElementById("submit-button").addEventListener("click", function(){
+          submit();
+        });
+        document.getElementById("getPubkey-button").addEventListener("click", async function(e){
+          await getPublicKeyFromLedger();
+        });
+
+        document.getElementById("verifyAddress-button").addEventListener("click", async function(e){
+          // Dont dim, let the user see the address on web
+          setStatus('Check your ledger to confirm your address');
+          await verifyAddressOnLedger();
+          setStatus('');
+        })
+
+        document.getElementById("reset-button").addEventListener("click", function(event){
+          reset();
+        })
+
+        const copyButton = document.getElementById("copy-button");
+        copyButton.addEventListener("click", function(event){
+          const sig = document.getElementById('signature').value;
+          navigator.clipboard.writeText(sig);
+          copyButton.classList.add('positive');
+          const icon = document.getElementById('copy-icon');
+          icon.classList.remove('copy');
+          icon.classList.add('checkmark');
+          setTimeout(() => {
+            copyButton.classList.remove('positive');
+            icon.classList.add('copy');
+            icon.classList.remove('checkmark');
+          }, 1500);
+          return false;
+        })
+
+        if (navigator.userAgent.indexOf(' Firefox') > -1) {
+          setError('It seems that you are using Firefox, which does not support the technology required to interact with a Ledger via this page. Try using a different browser.');
+        }
+
+      });
+
+      function dimBody(msg){
+        $("body").dimmer({closable:true}).dimmer("show");
+        $(".dimmer").html("<div class='content'> <h3> " + msg + "</h3></div>");
+      }
+
+      async function getLedger(){
+        if (!window.ledger) {
+          var transp = await window.TranspWeb.create();
+          window.ledger = new window.Kadena(transp);
+        }
+      }
+
+      const BIP32_PATH_PREFIX = "m/44'/626'/0'/0/";
+      function getPath() {
+        const {keyId} = getInputs();
+        return `${BIP32_PATH_PREFIX}${keyId}"`;
+      }
+
+      async function signWithLedger(){
+        clearError();
+        await getLedger();
+
+        let {json} = getInputs();
+        try {
+          const path = getPath();
+          const txn = window.txn = JSON.parse(json);
+          const cmd = window.cmd = JSON.parse(txn.cmd);
+          const pubKeys = cmd.signers.map(({pubKey}) => pubKey);
+          let sigIndex = pubKeys.indexOf(pubKey);
+          if (sigIndex === -1) {
+            throw new Error("Nothing to sign! Your account was not in found in cmd.signers[]. Do you need to select a different account?");
+          }
+
+          const bufferCmd = new TextEncoder().encode(txn.cmd);
+          const { signature: sigBuffer } = await window.ledger.signTransaction(path, bufferCmd);
+          const signature = sigBuffer.toString('hex');
+
+          document.getElementById("signature").value = signature;
+          document.getElementById('getSig-button').classList.add('disabled');
+          document.getElementById('getSig-button').innerText = 'Signed';
+          document.getElementById('copy-button').classList.remove('disabled');
+          document.getElementById('signature').scrollIntoView();
+
+          if (!txn.sigs) {
+            txn.sigs = [];
+          } else if (typeof txn.sigs === "object" && !Array.isArray(txn.sigs)) {
+            txn.sigs = cmd.signers.map(({ pubKey }) => ({ sig: txn.sigs[pubKey] }));
+          }
+          txn.sigs[sigIndex] = { sig: signature };
+
+          const numCollectedSigs = window.txn.sigs.filter(({sig}) => !!sig).length;
+          if (numCollectedSigs === cmd.signers.length) {
+            showSubmit();
+          } else {
+            resetSubmit('Note: one or more signatures missing. Submit disabled.');
+          }
+          setSuccess(`Signed! Your signature:`);
+          disableFields();
+        } catch (e) {
+          window.txn = undefined;
+          window.cmd = undefined;
+          resetSubmit();
+          if (e instanceof TypeError) {
+            setError("Error: " + e.message);
+          } else {
+            console.log("Unknown error:", e);
+            setError("Error: "+e.message);
+          }
+        }
+      }
+
+      function showSubmit(message = '') {
+        const submit = document.getElementById('submit-button');
+        submit.classList.remove('disabled');
+        submit.classList.add('primary');
+      }
+
+      function resetSubmit(message) {
+        const submit = document.getElementById('submit-button');
+        submit.classList.add('disabled');
+        submit.classList.remove('primary');
+        const notice = document.getElementById('submit-notice');
+        if (message) {
+          notice.style.display = 'block';
+          notice.innerText = message;
+        } else {
+          notice.style.display = 'none';
+        }
+      }
+
+      function setStatus(status) {
+        const elem = document.getElementById("status");
+        if (status) {
+          elem.innerText = status;
+          elem.style.display = 'block';
+        } else {
+          elem.style.display = 'none';
+        }
+      }
+
+      function setPublicKey(publicKey) {
+        document.getElementById("fromAccount").innerText = publicKey ? `k:${publicKey}` : '';
+        window.pubKey = publicKey;
+        let title = document.getElementById("getPubkey-button");
+        let content = document.getElementById("getPubkey-content");
+        title.classList.add('active')
+        content.classList.add('active')
+      }
+
+      function bufferToHex (buffer) {
+        return [...new Uint8Array (buffer)]
+          .map (b => b.toString (16).padStart (2, "0"))
+          .join ("");
+      }
+
+      async function getPublicKeyFromLedger(){
+        dimBody("Waiting for ledger public key");
+        setPublicKey('');
+        setStatus('Loading');
+        await getLedger();
+        try {
+          var publicKey = bufferToHex((await window.ledger.getPublicKey(getPath())).publicKey);
+          setPublicKey(publicKey);
+          setStatus();
+        } catch (e) {
+          setStatus('Error: '+e.message);
+          console.error(e);
+          setError("Could not get the Ledger Account Name " + e.message)
+        }
+        $("body").dimmer("hide");
+      }
+
+      async function verifyAddressOnLedger(){
+        await getLedger();
+        try {
+          var path = getPath();
+          var publicKey = bufferToHex((await window.ledger.verifyAddress(path)).publicKey);
+          setPublicKey(publicKey);
+        } catch (e) {
+          console.error(e);
+          setError("Could not get the Ledger Account Name "+e.message);
+        }
+      }
+
+      function reset(){
+        clearError();
+        $('.form').form('reset');
+        enableFields()
+        resetSubmit();
+        setStatus('');
+        clearError();
+        document.getElementById('signature').value = '';
+        document.getElementById('getSig-button').classList.remove('disabled');
+        document.getElementById('getSig-button').innerText = 'Sign with Ledger';
+        document.getElementById('status-box').classList.add("hidden")
+      }
+
+      function getNode(chainId) {
+        let apiHost = (node, networkId, chainId) => `https://${node}/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
+        if (getNetwork() === "mainnet01") {
+          return {
+            host : apiHost("api.chainweb.com", "mainnet01", chainId),
+            networkId: "mainnet01"
+          }
+        } else if (getNetwork() === "testnet04") {
+          return {
+            host : apiHost("api.testnet.chainweb.com", "testnet04", chainId),
+            networkId: "testnet04"
+          }
+        } else {
+          console.log(JSON.stringify(document.getElementById("network").innerText))
+        }
+      }
+
+      function getNetwork() {
+        return cmd && cmd.networkId;
+      }
+
+      async function wait(ms = 1000) {
+        return new Promise(resolve => {
+          setTimeout(resolve, ms);
+        });
+      }
+
+      async function submit() {
+        clearError();
+        const { chainId } = cmd.meta;
+        const { host, networkId } = getNode(chainId);
+        const txRes = await fetch(`${host}/api/v1/send`, mkReq({cmds: [txn]}))
+
+        document.getElementById('status-box').classList.remove("hidden")
+        if (txRes.ok) {
+          let res = await txRes.json();
+          document.getElementById('status-lookup').hidden = true;
+          document.getElementById('status-header').innerHTML = "Waiting for response...";
+          document.getElementById('status-message').innerText = JSON.stringify(res.requestKeys[0]);
+          fetch(`${host}/api/v1/listen`, mkReq({"listen": res.requestKeys[0]}))
+            .then(res =>{
+              return res.json()
+            })
+            .then(async res => {
+              if (res.result.status==="failure"){
+                document.getElementById('status-header').innerHTML = "Transfer Failed";
+                document.getElementById('status-message').innerText = JSON.stringify(res.result.error);
+                document.getElementById('status-lookup').hidden = false;
+                document.getElementById('status-link').innerText = res.reqKey;
+                document.getElementById('status-link').href = getLink(res.reqKey);
+              } else {
+                document.getElementById('status-header').innerHTML = "Transfer Succeeded.";
+                document.getElementById('status-message').innerText = JSON.stringify(res.result.data);
+                document.getElementById('status-lookup').hidden = false;
+                document.getElementById('status-link').innerText = res.reqKey;
+                document.getElementById('status-link').href = getLink(res.reqKey);
+              }
+            })
+        } else {
+          let res = await txRes.text();
+          document.getElementById('status-header').innerHTML = "Request Failed";
+          document.getElementById('status-message').innerText = res;
+          document.getElementById('status-lookup').hidden = true;
+        }
+        return (false);
+      };
+
+      let getLink = (reqKey) => `https://explorer.chainweb.com/${getNetwork()}/tx/${reqKey}`;
+
+      function setSuccess(msg) {
+        document.getElementById("acct-err").classList.add("green")
+        document.getElementById("acct-err").classList.remove("red")
+        document.getElementById("acct-err").hidden=false;
+        document.getElementById("acct-err").innerText = msg;
+      }
+
+      function setError(msg) {
+        document.getElementById("acct-err").classList.remove("green")
+        document.getElementById("acct-err").classList.add("red")
+        document.getElementById("acct-err").hidden=false;
+        document.getElementById("acct-err").innerText = msg;
+      }
+
+      function clearError (){
+        document.getElementById("acct-err").hidden=true;
+        document.getElementById("acct-err").innerText = "";
+      }
+
+      function getInputs (){
+        return {
+          keyId: document.getElementById("keyId").value,
+          json: document.getElementById("json").value,
+        }
+      }
+
+      const disable = function (field){
+        document.getElementById(field).disabled = true;
+      }
+
+      const enable = function (field){
+        document.getElementById(field).disabled = false;
+      }
+
+      const disableFields = function(){
+        let fields = ['json'];
+        fields.forEach(field => disable(field))
+      }
+
+      const enableFields = function (field){
+        let fields = ['json'];
+        fields.forEach(field => enable(field))
+      }
+
+      const isCrossChain = function (from, to) {
+        if (from!== to){
+          return true;
+        } else return false;
+      }
+
+</script>
+</head>
+<body>
+  <div id="main">
+    <div class="ui container">
+      <img src="https://explorer.chainweb.com/static/1lv9xhxyhlqc262kffl55w08ms1cvxsnrv49zhvm0b799dsi0v0i-kadena-k-logo.png" class="center" style="height:70px">
+      <h1>Kadena Sign JSON with Ledger</h1>
+      <div id="kadena-warning" class="ui warning message">
+        <i class="close icon"></i>
+        <div class="header">
+          Caution
+        </div>
+        <p>
+          Blockchain transactions are <b>irreversible</b>. If you make a mistake,
+          your coins <b>may not be recoverable</b>. Before you transfer large sums,
+          it is always best to do a small test transaction first and then
+          send those coins back to the sender to verify that the receiver's
+          account works as expected.
+        </p>
+      </div>
+      <div>
+        <div class="ui accordion">
+          <div class="title" id="getPubkey-button">
+            <i class="dropdown icon"></i>
+            Change/Verify Ledger Account Name
+          </div>
+          <div class="content" id="getPubkey-content">
+            <div class="ui message" style="margin-bottom:10px">
+              <div>
+                <div id="keyIdDropdown" class="ui floating small dropdown labeled search icon button">
+                  <input type="hidden" id="keyId" value="0" />
+                  <i class="key icon"></i>
+                  <div class="text">0</div>
+                  <div class="menu" id="ledger-key-menu">
+                  </div>
+                </div>
+                <i style="margin-right: -20px; margin-left: 5px" class="info icon small popup-target" data-content="Change ledger key. If unsure, leave the default (zero)."></i>
+              </div>
+
+              <p style="font-weight:bold;" id="fromAccount"></p>
+              <p style="font-weight:bold;" id="status"></p>
+
+              <div class="ui button" id="verifyAddress-button">
+                <i class="eye icon"></i>
+                <span>Verify</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <form id ="kadena-form" class="ui form" autocomplete="off">
+        You can use this form to sign JSON encoded transactions using your Ledger.
+        <div class="field">
+          <textarea placeholder="JSON encoded transaction goes here" rows="10" id="json"></textarea>
+        </div>
+        <button type="button" id="getSig-button" class="ui primary button">Sign with Ledger</button>
+        <button type="button" id="reset-button" class="ui button">Reset</button>
+        <br/>
+        <br/>
+        <div id="acct-err" class="ui center message" hidden></div>
+        <div class="field">
+          <div class="ui action input">
+            <input type="text" class="disabled" disabled placeholder="Signature" id="signature" />
+            <button type="button" id="copy-button" class="ui disabled right icon button">
+              <i id="copy-icon" class="copy icon"></i>
+            </button>
+          </div>
+        </div>
+        <div id="status-box" class="ui compact message result hidden">
+          <div class="header" id="status-header"></div>
+          <p id="status-message"></p>
+          <p id="status-lookup">Check your transaction: <br/><a id="status-link"/></a></p>
+        </div>
+        <br/>
+        <div id="submit-notice" style="display: none" class="ui center orange message"></div>
+        <button type="button" id="submit-button" class="ui disabled button">Submit Transaction</button>
+        <div type="text" id="publicKey" hidden /> </div>
+      </form>
+
+    </div>
+</body>
+<style>
+.container {
+  margin-top: 40px;
+  text-align: center;
+  padding-bottom: 50px;
+}
+
+#kadena-form {
+  margin: auto;
+  text-align: center;
+  max-width: 640px;
+}
+a:hover {
+  cursor:pointer;
+}
+.ui.dimmer {
+  background-color: rgba(0,0,0,.50);
+}
+.ui.dimmer .content {
+  background-color: rgba(0,0,0,.9);
+  padding: 7px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+</style>
+</html>
