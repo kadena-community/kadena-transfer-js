@@ -188,6 +188,10 @@
           document.getElementById("kadena-blind-sign-form-top").hidden = false;
         })
 
+        if (navigator.userAgent.indexOf(' Firefox') > -1) {
+          setError('It seems that you are using Firefox, which does not support the technology required to interact with a Ledger via this page. Try using a different browser.');
+        }
+
       });
 
       const localGasLimit = 1000

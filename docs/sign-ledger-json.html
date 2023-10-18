@@ -5,8 +5,6 @@
     <script src="https://code.jquery.com/jquery-3.1.1.min.js" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
     <script src="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/pact-lang-api@4.1.2/pact-lang-api-global.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
     <script src="../util/ledger-os.js"></script>
     <script src="../util/httptransp.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -22,82 +20,7 @@
           m.append(`<div class="item" data-value="${i}">${i}</div>`);
         }
 
-        // custom form validation rule
-        $.fn.form.settings.rules.validSig = function(sig) {
-          return sig.length === 128 && validateSig(sig);
-        };
-
-        $.fn.form.settings.rules.checkKeyset = function(keyset) {
-          if (document.getElementById("receiver-exist").hidden === false){
-            keyset = JSON.parse(keyset)
-            if (validateKeyset(keyset)) return true;
-            else if (!!keyset.keysetref) return true;
-            else return false;
-          } else return true;
-        }
-
-        $('#kadena-form')
-          .form({
-            on: 'blur',
-            fields: {
-              server: {
-                identifier  : 'server',
-                rules: [
-                  {
-                    type   : 'empty',
-                    prompt : 'Please enter a node server'
-                  }
-                ]
-              },
-              signature: {
-                identifier  : 'signature',
-                rules: [
-                  {
-                    type   : 'validSig',
-                    prompt : 'Signature is invalid. Please check again'
-                  }
-                ]
-              },
-              toAccount: {
-                identifier  : 'toAccount',
-                rules: [
-                  {
-                    type   : 'maxLength[66]',
-                  },
-                  {
-                    type   : 'minLength[64]',
-                  }
-                ]
-              },
-              existingGuard: {
-                identifier : 'receiver-keyset-fixed',
-                rules : [
-                  {
-                    type: 'checkKeyset',
-                    prompt: 'Transferring to the receiver is not supported.'
-                  }
-                ]
-              },
-              amount: {
-                identifier  : 'amount',
-                rules: [
-                  {
-                    type   : 'decimal[<0]',
-                  }
-                ]
-              }
-            },
-            inline : true
-          });
-
-        //Activate Menu
-        $('.ui.secondary.pointing.menu').on('click', ".item", function(e) {
-          $('.ui .item').removeClass('active');
-          $(this).addClass('active');
-          $(`.ui .segment .field`).attr("hidden", true)
-          $(`.ui .segment #${e.target.id}-input`).attr("hidden", false)
-        });
-        //Activate Dropdown
+        //Activate Ledger Dropdown
         $('.dropdown')
           .dropdown({ selectOnKeydown: false });
 
@@ -179,18 +102,11 @@
           return false;
         })
 
+        if (navigator.userAgent.indexOf(' Firefox') > -1) {
+          setError('It seems that you are using Firefox, which does not support the technology required to interact with a Ledger via this page. Try using a different browser.');
+        }
+
       });
-
-      const localGasLimit = 1000
-      const transferGasLimit = 2300;
-      const xChainInitiateGasLimit = 1800;
-      const xChainFinishGasLimit = 750;
-      const xChainFinishGasPrice = 0.00000001;
-      const gasPrice = 0.00001;
-
-      function formIsValid(){
-        return $('.form').form('is valid');
-      }
 
       function dimBody(msg){
         $("body").dimmer({closable:true}).dimmer("show");
@@ -249,6 +165,7 @@
             resetSubmit('Note: one or more signatures missing. Submit disabled.');
           }
           setSuccess(`Signed! Your signature:`);
+          disableFields();
         } catch (e) {
           window.txn = undefined;
           window.cmd = undefined;
@@ -268,13 +185,13 @@
         submit.classList.add('primary');
       }
 
-      function resetSubmit(message = '') {
+      function resetSubmit(message) {
         const submit = document.getElementById('submit-button');
         submit.classList.add('disabled');
         submit.classList.remove('primary');
         const notice = document.getElementById('submit-notice');
         if (message) {
-          notice.style.display = 'none';
+          notice.style.display = 'block';
           notice.innerText = message;
         } else {
           notice.style.display = 'none';
@@ -292,7 +209,6 @@
       }
 
       function setPublicKey(publicKey) {
-        document.getElementById("publicKey").value = [ publicKey ];
         document.getElementById("fromAccount").innerText = publicKey ? `k:${publicKey}` : '';
         window.pubKey = publicKey;
         let title = document.getElementById("getPubkey-button");
@@ -343,8 +259,10 @@
         resetSubmit();
         setStatus('');
         clearError();
+        document.getElementById('signature').value = '';
         document.getElementById('getSig-button').classList.remove('disabled');
         document.getElementById('getSig-button').innerText = 'Sign with Ledger';
+        document.getElementById('status-box').classList.add("hidden")
       }
 
       function getNode(chainId) {
@@ -416,151 +334,26 @@
 
       let getLink = (reqKey) => `https://explorer.chainweb.com/${getNetwork()}/tx/${reqKey}`;
 
-      async function fetchSenderKeyset(){
-        const chainId = document.getElementById("fromChainId").value;
-        const account = document.getElementById("fromAccount").innerText;
-        checkPublicKey(account, chainId).then(res => {
-          if (!res) {}
-          else if (res.result.status==="failure" && res.result.error.message.slice(0,24)==="with-read: row not found") {
-            document.getElementById("publicKey").value = ""
-            setError("Sender does not exist")
-          } else {
-            if (res.result.data.guard.keysetref) {
-              getKeysetRef(res.result.data.guard.keysetref, getNode(chainId).host).then(resKeyset => {
-                let publicKey = resKeyset.result.data.keys
-                document.getElementById("publicKey").value = publicKey
-                clearError();
-              });
-            } else if (res.result.data.guard.keys){
-              let publicKey = res.result.data.guard.keys
-              document.getElementById("publicKey").value = publicKey
-              clearError();
-            } else {
-              setError("Account Guard of the sender is not conventional. Please use a different tool.")
-            }
-          }
-        })
-      }
-
-      async function fetchReceiverKeyset(){
-        const chainId = document.getElementById("toChainId").value;
-        const account = document.getElementById("toAccount").value;
-        checkPublicKey(account, chainId).then(res => {
-          if (!res) {}
-          else if (res.result.status==="failure" && res.result.error.message.slice(0,24)==="with-read: row not found") {
-            document.getElementById("receiver-exist").hidden = true;
-            document.getElementById("receiver-keyset-fixed").value = null;
-          } else {
-            document.getElementById("receiver-exist").hidden = false;
-            document.getElementById("receiver-keyset-fixed").value = JSON.stringify(res.result.data.guard, undefined, 2);
-          }
-        })
-      }
-
-      const createTime = () =>  Math.round((new Date).getTime()/1000)-60;
-
       function setSuccess(msg) {
+        document.getElementById("acct-err").classList.add("green")
+        document.getElementById("acct-err").classList.remove("red")
         document.getElementById("acct-err").hidden=false;
         document.getElementById("acct-err").innerText = msg;
       }
 
       function setError(msg) {
-        document.getElementById("kadena-form").classList.add("error")
+        document.getElementById("acct-err").classList.remove("green")
+        document.getElementById("acct-err").classList.add("red")
         document.getElementById("acct-err").hidden=false;
         document.getElementById("acct-err").innerText = msg;
       }
 
       function clearError (){
-        document.getElementById("kadena-form").classList.remove("error")
         document.getElementById("acct-err").hidden=true;
         document.getElementById("acct-err").innerText = "";
       }
 
-      var decodeBase64 = function(s) {
-        validateBase64(s);
-        var i, d = atob(s), b = new Uint8Array(d.length);
-        for (i = 0; i < d.length; i++) b[i] = d.charCodeAt(i);
-        return b;
-      };
-
-      function decode(s) {
-        return  s.replace(/-/g, '+')
-          .replace(/_/g, '/')+"=";
-      }
-      function validateBase64(s) {
-        if (!(/^(?:[A-Za-z0-9+\/]{2}[A-Za-z0-9+\/]{2})*(?:[A-Za-z0-9+\/]{2}==|[A-Za-z0-9+\/]{3}=)?$/.test(s))) {
-          throw new TypeError('invalid encoding');
-        }
-      }
-
-      function validateSig (sig) {
-        let hash = document.getElementById("hash-string").innerText;
-        hash = decode(hash)
-        let pubKey = document.getElementById("publicKey").value;
-        try{
-          let verified = pubKey.filter(key => {
-            return nacl.sign.detached.verify(decodeBase64(hash),Pact.crypto.hexToBin(sig), Pact.crypto.hexToBin(key));
-          })
-          if (verified.length>0){
-            return true;
-          } else return false;
-        } catch(e){
-          return false;
-        }
-      }
-
-      async function getAccountDetails(account, node){
-        if (account.length>=3){
-          try {
-            const m = Pact.lang.mkMeta("", "", gasPrice, localGasLimit, createTime(), 28800);
-            const tx = await Pact.fetch.local({
-              pactCode: `(coin.details ${JSON.stringify(account)})`,
-              meta: m
-            }, node)
-            return tx;
-          } catch(e){
-            throw(e)
-          }
-        } else{
-          return false;
-        }
-      }
-
-      async function getKeysetRef(keyset, node){
-        try {
-          const m = Pact.lang.mkMeta("", "", gasPrice, localGasLimit, createTime(), 28800);
-          const tx = await Pact.fetch.local({
-            pactCode: `(describe-keyset ${JSON.stringify(keyset)})`,
-            meta: m
-          }, node)
-          return tx;
-        } catch(e){
-          throw(e)
-        }
-      }
-
-      async function checkPublicKey (account, chainId) {
-        let node = getNode(chainId).host;
-        return getAccountDetails(account, node);
-      }
-
-      function validateKeyset (keyset){
-        try {
-          const {pred, keys} = keyset;
-          let preds = [
-            "keys-all",
-            "keys-any",
-            "keys-2"
-          ]
-          let validKeys = keys.filter(keys=> keys.length===64).length === keys.length;
-          let validPred = preds.includes(pred);
-          return validKeys && validPred;
-        } catch {
-          return false;
-        }
-      }
-
-       function getInputs (){
+      function getInputs (){
         return {
           keyId: document.getElementById("keyId").value,
           json: document.getElementById("json").value,
@@ -665,7 +458,7 @@
           <p id="status-lookup">Check your transaction: <br/><a id="status-link"/></a></p>
         </div>
         <br/>
-        <div id="submit-notice" style="display: none" class="ui center message"></div>
+        <div id="submit-notice" style="display: none" class="ui center orange message"></div>
         <button type="button" id="submit-button" class="ui disabled button">Submit Transaction</button>
         <div type="text" id="publicKey" hidden /> </div>
       </form>
@@ -676,17 +469,13 @@
 .container {
   margin-top: 40px;
   text-align: center;
+  padding-bottom: 50px;
 }
 
 #kadena-form {
   margin: auto;
   text-align: center;
   max-width: 640px;
-}
-#kadena-blind-sign-form {
-  margin: auto;
-  text-align: center;
-  width: 400px;
 }
 a:hover {
   cursor:pointer;
