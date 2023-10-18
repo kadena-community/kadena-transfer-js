@@ -1,466 +1,248 @@
 <html>
 <head>
-    <title>Kadena Transfer Tool</title>
-    <link rel="icon" href="https://explorer.chainweb.com/static/img/favicon/0d63dkd822sxczcy51lbhqgflzdxw6lhgf88x2j7kc55hcpk120y-favicon-96x96.png">
-    <script src="https://code.jquery.com/jquery-3.1.1.min.js" crossorigin="anonymous"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.js"></script>
-    <script src="../util/ledger-os.js"></script>
-    <script src="../util/httptransp.js"></script>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kadena Transfer Tool</title>
+  <link rel="icon" href="https://explorer.chainweb.com/static/img/favicon/0d63dkd822sxczcy51lbhqgflzdxw6lhgf88x2j7kc55hcpk120y-favicon-96x96.png">
+  <script src="https://code.jquery.com/jquery-3.1.1.min.js" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.js"></script>
+  <script src="../util/ledger-os.js"></script>
+  <script src="../util/httptransp.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <script>
+  <script>
+    window.addEventListener('load', function (event) {
+      document.getElementById("search-specific-button").addEventListener("click", () => toggleSearch('specific'));
+      document.getElementById("search-prefix-button").addEventListener("click", () => toggleSearch('prefix'));
+    });
 
-      //Form Validation
-      $(document).ready(function(){
-
-        // create 1000 entries under "ledger key"
-        const m = $('#ledger-key-menu');
-        for(let i=0; i<=1000; i++) {
-          m.append(`<div class="item" data-value="${i}">${i}</div>`);
+    let searching = false;
+    function toggleSearch(name) {
+      if (searching) {
+        const wasSearching = searching;
+        stop(searching);
+        if (wasSearching !== name) {
+          setTimeout(() => toggleSearch(name), 1100);
         }
+      } else {
+        start(name);
+      }
+    }
 
-        //Activate Ledger Dropdown
-        $('.dropdown')
-          .dropdown({ selectOnKeydown: false });
+    function start(name) {
+      switch(name) {
+        case 'specific': return startSearchSpecific();
+        case 'prefix': return startSearchPrefix();
+        default: console.log('Unknown job to start:', name);
+      }
+    }
 
-        $('.popup-target')
-          .popup({ closable: false});
+    function stop(name) {
+      switch(name) {
+        case 'specific': return stopSearchSpecific();
+        case 'prefix': return stopSearchPrefix();
+        default: console.log('Unknown job to stop:', name);
+      }
+    }
 
-        $('.message .close')
-          .on('click', function() {
-            $(this)
-              .closest('.message')
-              .transition('fade')
-            ;
-          });
-      });
+    function toggleSearchPrefix() {
+      if (searching) {
+        stopSearchPrefix();
+      } else {
+        startSearchPrefix();
+      }
+    }
 
-      const mkReq = (cmd) => {
-        return {
-          headers: {
-"Content-Type": "application/json"
-          },
-          method: "POST",
-          body: JSON.stringify(cmd)
-        };
-      };
+    function startSearchPrefix() {
+      const input = document.getElementById("search-prefix");
+      const keys = validatePrefix(input.value);
+      if(keys.length) {
+        const btn = document.getElementById("search-prefix-button");
+        btn.innerText = 'Stop';
+        input.disabled = true;
+        search('prefix', keys.join(', '), publicKey => keys.some(key => publicKey.startsWith(key)), false);
+      }
+    }
 
-      // INITIATION FUNCTIONS
-      window.addEventListener('load', function (event) {
-        let prevTimeout;
-        document.getElementById("keyIdDropdown").addEventListener("change", async function(e){
-          // debounce - when typing we sometimes get multiple triggers
-          if (prevTimeout)
-            clearTimeout(prevTimeout);
-          prevTimeout = setTimeout(() => {
-            prevTimeout = null;
-            getPublicKeyFromLedger()
-          }, 200);
-        })
-        document.getElementById("getSig-button").addEventListener("click", async function(e){
-          if (!window.pubKey) {
-            await getPublicKeyFromLedger();
+    function stopSearchPrefix() {
+      searching = false;
+      reset();
+      const elem = document.getElementById('prefix-status');
+      elem.innerHTML = elem.innerHTML.replace('Searching for:', 'Stopped search for:');
+      elem.innerHTML = elem.innerHTML.replace('Looking in', 'Reached');
+    }
+
+    function startSearchSpecific() {
+      const input = document.getElementById("search-key");
+      const key = validateKey(input.value);
+      if (key) {
+        const btn = document.getElementById("search-specific-button");
+        btn.innerText = 'Stop';
+        input.disabled = true;
+        search('specific', key, publicKey => publicKey === key);
+      } else {
+        setStatus('specific', 'Error: Invalid key');
+      }
+    }
+
+    const BIP32_PATH_PREFIX = "m/44'/626'/0'/0/";
+    function getPath(keyId) {
+      return `${BIP32_PATH_PREFIX}${keyId}"`;
+    }
+
+    function bufferToHex (buffer) {
+      return [...new Uint8Array (buffer)]
+        .map (b => b.toString (16).padStart (2, "0"))
+        .join ("");
+    }
+
+    async function getLedger(){
+      if (!window.ledger) {
+        var transp = await window.TranspWeb.create();
+        window.ledger = new window.Kadena(transp);
+      }
+    }
+
+    function copyPrefixResults(elem) {
+      const str = res.map(([n, key]) => `Key ${n}: ${key}`).join('\n');
+      navigator.clipboard.writeText(str);
+      elem.classList.add('green');
+      const icon = elem.childNodes[0];
+      icon.classList.remove("copy");
+      icon.classList.add("checkmark");
+    }
+
+    let res = [];
+    async function search(name, key, pred, once = true) {
+      searching = name;
+      let i = 0;
+      await getLedger();
+      let suffix = '';
+      while(searching) {
+        try {
+          const shortKey = key.slice(0, 6)+'..'+key.slice(-6);
+          setStatus(name, `Searching for:<br/>${key}<br/><br/>Looking in slot: ${i}<div class="rel">${suffix}</div>`, suffix ? 'green' : 'yellow');
+          const publicKey = bufferToHex((await window.ledger.getPublicKey(getPath(i))).publicKey);
+          if (pred(publicKey)) {
+            if (once) {
+              searching = false;
+              setStatus(name, `<strong>Found</strong><br/><strong>Slot: ${i}</strong><br/>Path: ${getPath(i)}<br/>Key: ${publicKey}`, 'green');
+              reset();
+            } else {
+              suffix = suffix ? suffix : '<div class="ui divider"></div><strong style="text-decoration: underline">Found</strong><br/><button onclick="copyPrefixResults(this)" type="button" id="copybtn" class="circular topright ui icon button"><i class="icon copy"></i></button>';
+              suffix += `<strong>Slot ${i}</strong> (${getPath(i)})<br/>${publicKey}<br/><br/>`;
+              res.push([i, publicKey]);
+            }
           }
-          if (window.pubKey) {
-            dimBody("Waiting for ledger signature");
-            await signWithLedger();
-            $("body").dimmer("hide");
-          }
-        });
-        document.getElementById("submit-button").addEventListener("click", function(){
-          submit();
-        });
-        document.getElementById("getPubkey-button").addEventListener("click", async function(e){
-          await getPublicKeyFromLedger();
-        });
-
-        document.getElementById("verifyAddress-button").addEventListener("click", async function(e){
-          // Dont dim, let the user see the address on web
-          setStatus('Check your ledger to confirm your address');
-          await verifyAddressOnLedger();
-          setStatus('');
-        })
-
-        document.getElementById("reset-button").addEventListener("click", function(event){
+          i++;
+        } catch(e) {
+          searching = false;
+          console.error(e);
+          setStatus(name, 'Error: '+e.message);
           reset();
-        })
-
-        const copyButton = document.getElementById("copy-button");
-        copyButton.addEventListener("click", function(event){
-          const sig = document.getElementById('signature').value;
-          navigator.clipboard.writeText(sig);
-          copyButton.classList.add('positive');
-          const icon = document.getElementById('copy-icon');
-          icon.classList.remove('copy');
-          icon.classList.add('checkmark');
-          setTimeout(() => {
-            copyButton.classList.remove('positive');
-            icon.classList.add('copy');
-            icon.classList.remove('checkmark');
-          }, 1500);
-          return false;
-        })
-
-        if (navigator.userAgent.indexOf(' Firefox') > -1) {
-          setError('It seems that you are using Firefox, which does not support the technology required to interact with a Ledger via this page. Try using a different browser.');
         }
+      }
+    }
 
+    function stopSearchSpecific() {
+      searching = false;
+      setStatus('specific');
+      reset();
+    }
+
+    function reset() {
+      [['search-specific-button', 'search-key'], ['search-prefix-button', 'search-prefix']].forEach(([btnId, inputId]) => {
+        const btn = document.getElementById(btnId);
+        btn.innerText = 'Search';
+        const input = document.getElementById(inputId);
+        input.disabled = false;
       });
+    }
 
-      function dimBody(msg){
-        $("body").dimmer({closable:true}).dimmer("show");
-        $(".dimmer").html("<div class='content'> <h3> " + msg + "</h3></div>");
+    function setStatus(name, value, cl) {
+      const elem = document.getElementById(name+'-status');
+      ['yellow', 'red', 'green'].forEach(c => elem.classList.remove(c));
+      if (cl)
+        elem.classList.add(cl);
+      else
+        elem.classList.add('red');
+      if (value) {
+        elem.style.display='block';
+        elem.innerHTML = value;
+      } else {
+        elem.style.display='none';
+        elem.innerHTML = '';
       }
+    }
 
-      async function getLedger(){
-        if (!window.ledger) {
-          var transp = await window.TranspWeb.create();
-          window.ledger = new window.Kadena(transp);
-        }
+    function validatePrefix(input = '') {
+      input = input.split(',').map(word => word.trim().toLowerCase().replace(/^k:/, '')).filter(Boolean);
+      const hexRegex = /^[0-9a-f]+$/;
+      const invalid = input.filter(word => !hexRegex.test(word));
+      if (invalid.length) {
+        setStatus('prefix', `Error: Invalid prefixes: ${invalid.join(', ')}`);
+        return;
       }
+      return input;
+    }
 
-      const BIP32_PATH_PREFIX = "m/44'/626'/0'/0/";
-      function getPath() {
-        const {keyId} = getInputs();
-        return `${BIP32_PATH_PREFIX}${keyId}"`;
+    function validateKey(input = '') {
+      input = input.trim().toLowerCase();
+      if (input.startsWith('k:')) {
+        input = input.slice(2);
       }
+      return input.length === 64 && /[0-9a-f]+/.test(input) && input;
+    }
 
-      async function signWithLedger(){
-        clearError();
-        await getLedger();
+    function prefixTemplate(name) {
+      if (searching === 'prefix')
+        return;
+      const input = document.getElementById("search-prefix");
+      input.value = name === 'all' ? Object.values(templates).flat().join(',') : templates[name].join(',');
+    }
 
-        let {json} = getInputs();
-        try {
-          const path = getPath();
-          const txn = window.txn = JSON.parse(json);
-          const cmd = window.cmd = JSON.parse(txn.cmd);
-          const pubKeys = cmd.signers.map(({pubKey}) => pubKey);
-          let sigIndex = pubKeys.indexOf(pubKey);
-          if (sigIndex === -1) {
-            throw new Error("Nothing to sign! Your account was not in found in cmd.signers[]. Do you need to select a different account?");
-          }
+    const templates = {
+      "2": [ '000', '111', '222', '333', '444', '555', '666', '777', '888', '999', 'aaa', 'bbb', 'ccc', 'ddd', 'eee', 'fff' ],
+      "3": ["aba", "ace", "add", "aff", "baa", "bad", "bed", "bee", "cab", "cad", "cee", "dab", "dad", "deb", "dee", "ebb", "eff", "fad", "fed", "fee",],
+      "4": ["abba", "abbe", "abed", "aced", "baba", "babe", "bade", "baff", "bead", "beef", "caca", "cade", "cafe", "caff", "ceca", "cede", "dace", "dada", "daff", "dead", "deaf", "deed", "face", "fade", "feed"],
+    };
 
-          const bufferCmd = new TextEncoder().encode(txn.cmd);
-          const { signature: sigBuffer } = await window.ledger.signTransaction(path, bufferCmd);
-          const signature = sigBuffer.toString('hex');
-
-          document.getElementById("signature").value = signature;
-          document.getElementById('getSig-button').classList.add('disabled');
-          document.getElementById('getSig-button').innerText = 'Signed';
-          document.getElementById('copy-button').classList.remove('disabled');
-          document.getElementById('signature').scrollIntoView();
-
-          if (!txn.sigs) {
-            txn.sigs = [];
-          } else if (typeof txn.sigs === "object" && !Array.isArray(txn.sigs)) {
-            txn.sigs = cmd.signers.map(({ pubKey }) => ({ sig: txn.sigs[pubKey] }));
-          }
-          txn.sigs[sigIndex] = { sig: signature };
-
-          const numCollectedSigs = window.txn.sigs.filter(({sig}) => !!sig).length;
-          if (numCollectedSigs === cmd.signers.length) {
-            showSubmit();
-          } else {
-            resetSubmit('Note: one or more signatures missing. Submit disabled.');
-          }
-          setSuccess(`Signed! Your signature:`);
-          disableFields();
-        } catch (e) {
-          window.txn = undefined;
-          window.cmd = undefined;
-          resetSubmit();
-          if (e instanceof TypeError) {
-            setError("Error: " + e.message);
-          } else {
-            console.log("Unknown error:", e);
-            setError("Error: "+e.message);
-          }
-        }
-      }
-
-      function showSubmit(message = '') {
-        const submit = document.getElementById('submit-button');
-        submit.classList.remove('disabled');
-        submit.classList.add('primary');
-      }
-
-      function resetSubmit(message) {
-        const submit = document.getElementById('submit-button');
-        submit.classList.add('disabled');
-        submit.classList.remove('primary');
-        const notice = document.getElementById('submit-notice');
-        if (message) {
-          notice.style.display = 'block';
-          notice.innerText = message;
-        } else {
-          notice.style.display = 'none';
-        }
-      }
-
-      function setStatus(status) {
-        const elem = document.getElementById("status");
-        if (status) {
-          elem.innerText = status;
-          elem.style.display = 'block';
-        } else {
-          elem.style.display = 'none';
-        }
-      }
-
-      function setPublicKey(publicKey) {
-        document.getElementById("fromAccount").innerText = publicKey ? `k:${publicKey}` : '';
-        window.pubKey = publicKey;
-        let title = document.getElementById("getPubkey-button");
-        let content = document.getElementById("getPubkey-content");
-        title.classList.add('active')
-        content.classList.add('active')
-      }
-
-      function bufferToHex (buffer) {
-        return [...new Uint8Array (buffer)]
-          .map (b => b.toString (16).padStart (2, "0"))
-          .join ("");
-      }
-
-      async function getPublicKeyFromLedger(){
-        dimBody("Waiting for ledger public key");
-        setPublicKey('');
-        setStatus('Loading');
-        await getLedger();
-        try {
-          var publicKey = bufferToHex((await window.ledger.getPublicKey(getPath())).publicKey);
-          setPublicKey(publicKey);
-          setStatus();
-        } catch (e) {
-          setStatus('Error: '+e.message);
-          console.error(e);
-          setError("Could not get the Ledger Account Name " + e.message)
-        }
-        $("body").dimmer("hide");
-      }
-
-      async function verifyAddressOnLedger(){
-        await getLedger();
-        try {
-          var path = getPath();
-          var publicKey = bufferToHex((await window.ledger.verifyAddress(path)).publicKey);
-          setPublicKey(publicKey);
-        } catch (e) {
-          console.error(e);
-          setError("Could not get the Ledger Account Name "+e.message);
-        }
-      }
-
-      function reset(){
-        clearError();
-        $('.form').form('reset');
-        enableFields()
-        resetSubmit();
-        setStatus('');
-        clearError();
-        document.getElementById('signature').value = '';
-        document.getElementById('getSig-button').classList.remove('disabled');
-        document.getElementById('getSig-button').innerText = 'Sign with Ledger';
-        document.getElementById('status-box').classList.add("hidden")
-      }
-
-      function getNode(chainId) {
-        let apiHost = (node, networkId, chainId) => `https://${node}/chainweb/0.0/${networkId}/chain/${chainId}/pact`;
-        if (getNetwork() === "mainnet01") {
-          return {
-            host : apiHost("api.chainweb.com", "mainnet01", chainId),
-            networkId: "mainnet01"
-          }
-        } else if (getNetwork() === "testnet04") {
-          return {
-            host : apiHost("api.testnet.chainweb.com", "testnet04", chainId),
-            networkId: "testnet04"
-          }
-        } else {
-          console.log(JSON.stringify(document.getElementById("network").innerText))
-        }
-      }
-
-      function getNetwork() {
-        return cmd && cmd.networkId;
-      }
-
-      async function wait(ms = 1000) {
-        return new Promise(resolve => {
-          setTimeout(resolve, ms);
-        });
-      }
-
-      async function submit() {
-        clearError();
-        const { chainId } = cmd.meta;
-        const { host, networkId } = getNode(chainId);
-        const txRes = await fetch(`${host}/api/v1/send`, mkReq({cmds: [txn]}))
-
-        document.getElementById('status-box').classList.remove("hidden")
-        if (txRes.ok) {
-          let res = await txRes.json();
-          document.getElementById('status-lookup').hidden = true;
-          document.getElementById('status-header').innerHTML = "Waiting for response...";
-          document.getElementById('status-message').innerText = JSON.stringify(res.requestKeys[0]);
-          fetch(`${host}/api/v1/listen`, mkReq({"listen": res.requestKeys[0]}))
-            .then(res =>{
-              return res.json()
-            })
-            .then(async res => {
-              if (res.result.status==="failure"){
-                document.getElementById('status-header').innerHTML = "Transfer Failed";
-                document.getElementById('status-message').innerText = JSON.stringify(res.result.error);
-                document.getElementById('status-lookup').hidden = false;
-                document.getElementById('status-link').innerText = res.reqKey;
-                document.getElementById('status-link').href = getLink(res.reqKey);
-              } else {
-                document.getElementById('status-header').innerHTML = "Transfer Succeeded.";
-                document.getElementById('status-message').innerText = JSON.stringify(res.result.data);
-                document.getElementById('status-lookup').hidden = false;
-                document.getElementById('status-link').innerText = res.reqKey;
-                document.getElementById('status-link').href = getLink(res.reqKey);
-              }
-            })
-        } else {
-          let res = await txRes.text();
-          document.getElementById('status-header').innerHTML = "Request Failed";
-          document.getElementById('status-message').innerText = res;
-          document.getElementById('status-lookup').hidden = true;
-        }
-        return (false);
-      };
-
-      let getLink = (reqKey) => `https://explorer.chainweb.com/${getNetwork()}/tx/${reqKey}`;
-
-      function setSuccess(msg) {
-        document.getElementById("acct-err").classList.add("green")
-        document.getElementById("acct-err").classList.remove("red")
-        document.getElementById("acct-err").hidden=false;
-        document.getElementById("acct-err").innerText = msg;
-      }
-
-      function setError(msg) {
-        document.getElementById("acct-err").classList.remove("green")
-        document.getElementById("acct-err").classList.add("red")
-        document.getElementById("acct-err").hidden=false;
-        document.getElementById("acct-err").innerText = msg;
-      }
-
-      function clearError (){
-        document.getElementById("acct-err").hidden=true;
-        document.getElementById("acct-err").innerText = "";
-      }
-
-      function getInputs (){
-        return {
-          keyId: document.getElementById("keyId").value,
-          json: document.getElementById("json").value,
-        }
-      }
-
-      const disable = function (field){
-        document.getElementById(field).disabled = true;
-      }
-
-      const enable = function (field){
-        document.getElementById(field).disabled = false;
-      }
-
-      const disableFields = function(){
-        let fields = ['json'];
-        fields.forEach(field => disable(field))
-      }
-
-      const enableFields = function (field){
-        let fields = ['json'];
-        fields.forEach(field => enable(field))
-      }
-
-      const isCrossChain = function (from, to) {
-        if (from!== to){
-          return true;
-        } else return false;
-      }
-
-</script>
+  </script>
 </head>
 <body>
   <div id="main">
     <div class="ui container">
       <img src="https://explorer.chainweb.com/static/1lv9xhxyhlqc262kffl55w08ms1cvxsnrv49zhvm0b799dsi0v0i-kadena-k-logo.png" class="center" style="height:70px">
-      <h1>Kadena Sign JSON with Ledger</h1>
-      <div id="kadena-warning" class="ui warning message">
-        <i class="close icon"></i>
-        <div class="header">
-          Caution
-        </div>
-        <p>
-          Blockchain transactions are <b>irreversible</b>. If you make a mistake,
-          your coins <b>may not be recoverable</b>. Before you transfer large sums,
-          it is always best to do a small test transaction first and then
-          send those coins back to the sender to verify that the receiver's
-          account works as expected.
-        </p>
-      </div>
-      <div>
-        <div class="ui accordion">
-          <div class="title" id="getPubkey-button">
-            <i class="dropdown icon"></i>
-            Change/Verify Ledger Account Name
-          </div>
-          <div class="content" id="getPubkey-content">
-            <div class="ui message" style="margin-bottom:10px">
-              <div>
-                <div id="keyIdDropdown" class="ui floating small dropdown labeled search icon button">
-                  <input type="hidden" id="keyId" value="0" />
-                  <i class="key icon"></i>
-                  <div class="text">0</div>
-                  <div class="menu" id="ledger-key-menu">
-                  </div>
-                </div>
-                <i style="margin-right: -20px; margin-left: 5px" class="info icon small popup-target" data-content="Change ledger key. If unsure, leave the default (zero)."></i>
-              </div>
+      <h1>Kadena Search Ledger Keys</h1>
 
-              <p style="font-weight:bold;" id="fromAccount"></p>
-              <p style="font-weight:bold;" id="status"></p>
-
-              <div class="ui button" id="verifyAddress-button">
-                <i class="eye icon"></i>
-                <span>Verify</span>
-              </div>
+      <form id="kadena-form" class="ui form">
+        <div class="ui segment">
+          <h4 class="ui header">Search for key (exact)</h4>
+          <div class="field">
+            <div class="ui action input">
+              <input placeholder="Account to search for" id="search-key" class="ui input"></input>
+              <button type="button" id="search-specific-button" class="ui right button">Search</button>
             </div>
           </div>
+          <div class="ui raised segment" style="display: none" id="specific-status"></div>
         </div>
-      </div>
-      <form id ="kadena-form" class="ui form" autocomplete="off">
-        You can use this form to sign JSON encoded transactions using your Ledger.
-        <div class="field">
-          <textarea placeholder="JSON encoded transaction goes here" rows="10" id="json"></textarea>
-        </div>
-        <button type="button" id="getSig-button" class="ui primary button">Sign with Ledger</button>
-        <button type="button" id="reset-button" class="ui button">Reset</button>
-        <br/>
-        <br/>
-        <div id="acct-err" class="ui center message" hidden></div>
-        <div class="field">
-          <div class="ui action input">
-            <input type="text" class="disabled" disabled placeholder="Signature" id="signature" />
-            <button type="button" id="copy-button" class="ui disabled right icon button">
-              <i id="copy-icon" class="copy icon"></i>
-            </button>
+
+        <div class="ui segment">
+          <h4 class="ui header">Search for key prefix</h4>
+          <div class="field">
+            <div class="ui action input">
+              <input placeholder="Prefix(es) to search for" id="search-prefix" class="ui input"></input>
+              <button type="button" id="search-prefix-button" class="ui right button">Search</button>
+            </div>
           </div>
+          <p>Tip: You can search for multiple prefixes by separating them with comma (,)<br/>
+            Templates:
+            <a onclick="prefixTemplate('2')">3-identical</a>
+            <a onclick="prefixTemplate('3')">3-word</a>
+            <a onclick="prefixTemplate('4')">4-word</a>
+            <a onclick="prefixTemplate('all')">All</a>
+          </p>
+          <div class="ui raised segment" style="display: none" id="prefix-status"></div>
         </div>
-        <div id="status-box" class="ui compact message result hidden">
-          <div class="header" id="status-header"></div>
-          <p id="status-message"></p>
-          <p id="status-lookup">Check your transaction: <br/><a id="status-link"/></a></p>
-        </div>
-        <br/>
-        <div id="submit-notice" style="display: none" class="ui center orange message"></div>
-        <button type="button" id="submit-button" class="ui disabled button">Submit Transaction</button>
-        <div type="text" id="publicKey" hidden /> </div>
       </form>
 
     </div>
@@ -488,6 +270,17 @@ a:hover {
   padding: 7px;
   padding-left: 10px;
   padding-right: 10px;
+}
+.rel {
+  position: relative;
+}
+.segment {
+  word-break: break-word;
+}
+.topright {
+  position: absolute;
+  top: 5px;
+  right: 0;
 }
 </style>
 </html>
