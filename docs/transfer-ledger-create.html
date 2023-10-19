@@ -294,7 +294,7 @@
         var txnHash = document.getElementById("blind-signing-hash").value
         try {
           var signed = await window.ledger.signHash(getPath(),txnHash);
-          var sig = signed.signature;
+          var sig = bufferToHex(signed.signature);
           document.getElementById("signature-blind-sig").value = sig;
           document.getElementById("signature-blind-sig-field").hidden = false;
         } catch (e) {
