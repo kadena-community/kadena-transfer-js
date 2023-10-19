@@ -17,15 +17,11 @@
 
     let searching = false;
     function toggleSearch(name) {
-      if (searching) {
-        const wasSearching = searching;
-        stop(searching);
-        if (wasSearching !== name) {
-          setTimeout(() => toggleSearch(name), 1100);
-        }
-      } else {
-        start(name);
-      }
+      if (!searching) return start(name);
+      const wasSearching = searching;
+      stop(searching);
+      if (wasSearching === name) return;
+      setTimeout(() => toggleSearch(name), 1100);
     }
 
     function start(name) {
@@ -114,26 +110,28 @@
     let res = [];
     async function search(name, key, pred, once = true) {
       searching = name;
-      let i = 0;
+      let i = -1;
       await getLedger();
       let suffix = '';
       while(searching) {
+        i++;
         try {
           const shortKey = key.slice(0, 6)+'..'+key.slice(-6);
           setStatus(name, `Searching for:<br/>${key}<br/><br/>Looking in slot: ${i}<div class="rel">${suffix}</div>`, suffix ? 'green' : 'yellow');
           const publicKey = bufferToHex((await window.ledger.getPublicKey(getPath(i))).publicKey);
-          if (pred(publicKey)) {
-            if (once) {
-              searching = false;
-              setStatus(name, `<strong>Found</strong><br/><strong>Slot: ${i}</strong><br/>Path: ${getPath(i)}<br/>Key: ${publicKey}`, 'green');
-              reset();
-            } else {
-              suffix = suffix ? suffix : '<div class="ui divider"></div><strong style="text-decoration: underline">Found</strong><br/><button onclick="copyPrefixResults(this)" type="button" id="copybtn" class="circular topright ui icon button"><i class="icon copy"></i></button>';
-              suffix += `<strong>Slot ${i}</strong> (${getPath(i)})<br/>${publicKey}<br/><br/>`;
-              res.push([i, publicKey]);
-            }
+          // not the key we are looking for. continue
+          if (!pred(publicKey)) continue;
+          // found and we only care about one key. finish it
+          if (once) {
+            searching = false;
+            setStatus(name, `<strong>Found</strong><br/><strong>Slot: ${i}</strong><br/>Path: ${getPath(i)}<br/>Key: ${publicKey}`, 'green');
+            reset();
+            break;
           }
-          i++;
+          // found but we keep looking
+          suffix = suffix ? suffix : '<div class="ui divider"></div><strong style="text-decoration: underline">Found</strong><br/><button onclick="copyPrefixResults(this)" type="button" id="copybtn" class="circular topright ui icon button"><i class="icon copy"></i></button>';
+          suffix += `<strong>Slot ${i}</strong> (${getPath(i)})<br/>${publicKey}<br/><br/>`;
+          res.push([i, publicKey]);
         } catch(e) {
           searching = false;
           console.error(e);
