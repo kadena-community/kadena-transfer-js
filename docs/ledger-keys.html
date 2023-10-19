@@ -1,0 +1,284 @@
+<html>
+<head>
+  <title>Kadena Transfer Tool</title>
+  <link rel="icon" href="https://explorer.chainweb.com/static/img/favicon/0d63dkd822sxczcy51lbhqgflzdxw6lhgf88x2j7kc55hcpk120y-favicon-96x96.png">
+  <script src="https://code.jquery.com/jquery-3.1.1.min.js" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.js"></script>
+  <script src="../util/ledger-os.js"></script>
+  <script src="../util/httptransp.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <script>
+    window.addEventListener('load', function (event) {
+      document.getElementById("search-specific-button").addEventListener("click", () => toggleSearch('specific'));
+      document.getElementById("search-prefix-button").addEventListener("click", () => toggleSearch('prefix'));
+    });
+
+    let searching = false;
+    function toggleSearch(name) {
+      if (!searching) return start(name);
+      const wasSearching = searching;
+      stop(searching);
+      if (wasSearching === name) return;
+      setTimeout(() => toggleSearch(name), 1100);
+    }
+
+    function start(name) {
+      switch(name) {
+        case 'specific': return startSearchSpecific();
+        case 'prefix': return startSearchPrefix();
+        default: console.log('Unknown job to start:', name);
+      }
+    }
+
+    function stop(name) {
+      switch(name) {
+        case 'specific': return stopSearchSpecific();
+        case 'prefix': return stopSearchPrefix();
+        default: console.log('Unknown job to stop:', name);
+      }
+    }
+
+    function toggleSearchPrefix() {
+      if (searching) {
+        stopSearchPrefix();
+      } else {
+        startSearchPrefix();
+      }
+    }
+
+    function startSearchPrefix() {
+      const input = document.getElementById("search-prefix");
+      const keys = validatePrefix(input.value);
+      if(keys.length) {
+        const btn = document.getElementById("search-prefix-button");
+        btn.innerText = 'Stop';
+        input.disabled = true;
+        search('prefix', keys.join(', '), publicKey => keys.some(key => publicKey.startsWith(key)), false);
+      }
+    }
+
+    function stopSearchPrefix() {
+      searching = false;
+      reset();
+      const elem = document.getElementById('prefix-status');
+      elem.innerHTML = elem.innerHTML.replace('Searching for:', 'Stopped search for:');
+      elem.innerHTML = elem.innerHTML.replace('Looking in', 'Reached');
+    }
+
+    function startSearchSpecific() {
+      const input = document.getElementById("search-key");
+      const key = validateKey(input.value);
+      if (key) {
+        const btn = document.getElementById("search-specific-button");
+        btn.innerText = 'Stop';
+        input.disabled = true;
+        search('specific', key, publicKey => publicKey === key);
+      } else {
+        setStatus('specific', 'Error: Invalid key');
+      }
+    }
+
+    const BIP32_PATH_PREFIX = "m/44'/626'/0'/0/";
+    function getPath(keyId) {
+      return `${BIP32_PATH_PREFIX}${keyId}"`;
+    }
+
+    function bufferToHex (buffer) {
+      return [...new Uint8Array (buffer)]
+        .map (b => b.toString (16).padStart (2, "0"))
+        .join ("");
+    }
+
+    async function getLedger(){
+      if (!window.ledger) {
+        var transp = await window.TranspWeb.create();
+        window.ledger = new window.Kadena(transp);
+      }
+    }
+
+    function copyPrefixResults(elem) {
+      const str = res.map(([n, key]) => `Key ${n}: ${key}`).join('\n');
+      navigator.clipboard.writeText(str);
+      elem.classList.add('green');
+      const icon = elem.childNodes[0];
+      icon.classList.remove("copy");
+      icon.classList.add("checkmark");
+    }
+
+    let res = [];
+    async function search(name, key, pred, once = true) {
+      searching = name;
+      let i = -1;
+      await getLedger();
+      let suffix = '';
+      while(searching) {
+        i++;
+        try {
+          const shortKey = key.slice(0, 6)+'..'+key.slice(-6);
+          setStatus(name, `Searching for:<br/>${key}<br/><br/>Looking in slot: ${i}<div class="rel">${suffix}</div>`, suffix ? 'green' : 'yellow');
+          const publicKey = bufferToHex((await window.ledger.getPublicKey(getPath(i))).publicKey);
+          // not the key we are looking for. continue
+          if (!pred(publicKey)) continue;
+          // found and we only care about one key. finish it
+          if (once) {
+            searching = false;
+            setStatus(name, `<strong>Found</strong><br/><strong>Slot: ${i}</strong><br/>Path: ${getPath(i)}<br/>Key: ${publicKey}`, 'green');
+            reset();
+            break;
+          }
+          // found but we keep looking
+          suffix = suffix ? suffix : '<div class="ui divider"></div><strong style="text-decoration: underline">Found</strong><br/><button onclick="copyPrefixResults(this)" type="button" id="copybtn" class="circular topright ui icon button"><i class="icon copy"></i></button>';
+          suffix += `<strong>Slot ${i}</strong> (${getPath(i)})<br/>${publicKey}<br/><br/>`;
+          res.push([i, publicKey]);
+        } catch(e) {
+          searching = false;
+          console.error(e);
+          setStatus(name, 'Error: '+e.message);
+          reset();
+        }
+      }
+    }
+
+    function stopSearchSpecific() {
+      searching = false;
+      setStatus('specific');
+      reset();
+    }
+
+    function reset() {
+      [['search-specific-button', 'search-key'], ['search-prefix-button', 'search-prefix']].forEach(([btnId, inputId]) => {
+        const btn = document.getElementById(btnId);
+        btn.innerText = 'Search';
+        const input = document.getElementById(inputId);
+        input.disabled = false;
+      });
+    }
+
+    function setStatus(name, value, cl) {
+      const elem = document.getElementById(name+'-status');
+      ['yellow', 'red', 'green'].forEach(c => elem.classList.remove(c));
+      if (cl)
+        elem.classList.add(cl);
+      else
+        elem.classList.add('red');
+      if (value) {
+        elem.style.display='block';
+        elem.innerHTML = value;
+      } else {
+        elem.style.display='none';
+        elem.innerHTML = '';
+      }
+    }
+
+    function validatePrefix(input = '') {
+      input = input.split(',').map(word => word.trim().toLowerCase().replace(/^k:/, '')).filter(Boolean);
+      const hexRegex = /^[0-9a-f]+$/;
+      const invalid = input.filter(word => !hexRegex.test(word));
+      if (invalid.length) {
+        setStatus('prefix', `Error: Invalid prefixes: ${invalid.join(', ')}`);
+        return;
+      }
+      return input;
+    }
+
+    function validateKey(input = '') {
+      input = input.trim().toLowerCase();
+      if (input.startsWith('k:')) {
+        input = input.slice(2);
+      }
+      return input.length === 64 && /[0-9a-f]+/.test(input) && input;
+    }
+
+    function prefixTemplate(name) {
+      if (searching === 'prefix')
+        return;
+      const input = document.getElementById("search-prefix");
+      input.value = name === 'all' ? Object.values(templates).flat().join(',') : templates[name].join(',');
+    }
+
+    const templates = {
+      "2": [ '000', '111', '222', '333', '444', '555', '666', '777', '888', '999', 'aaa', 'bbb', 'ccc', 'ddd', 'eee', 'fff' ],
+      "3": ["aba", "ace", "add", "aff", "baa", "bad", "bed", "bee", "cab", "cad", "cee", "dab", "dad", "deb", "dee", "ebb", "eff", "fad", "fed", "fee",],
+      "4": ["abba", "abbe", "abed", "aced", "baba", "babe", "bade", "baff", "bead", "beef", "caca", "cade", "cafe", "caff", "ceca", "cede", "dace", "dada", "daff", "dead", "deaf", "deed", "face", "fade", "feed"],
+    };
+
+  </script>
+</head>
+<body>
+  <div id="main">
+    <div class="ui container">
+      <img src="https://explorer.chainweb.com/static/1lv9xhxyhlqc262kffl55w08ms1cvxsnrv49zhvm0b799dsi0v0i-kadena-k-logo.png" class="center" style="height:70px">
+      <h1>Kadena Search Ledger Keys</h1>
+
+      <form id="kadena-form" class="ui form">
+        <div class="ui segment">
+          <h4 class="ui header">Search for key (exact)</h4>
+          <div class="field">
+            <div class="ui action input">
+              <input placeholder="Account to search for" id="search-key" class="ui input"></input>
+              <button type="button" id="search-specific-button" class="ui right button">Search</button>
+            </div>
+          </div>
+          <div class="ui raised segment" style="display: none" id="specific-status"></div>
+        </div>
+
+        <div class="ui segment">
+          <h4 class="ui header">Search for key prefix</h4>
+          <div class="field">
+            <div class="ui action input">
+              <input placeholder="Prefix(es) to search for" id="search-prefix" class="ui input"></input>
+              <button type="button" id="search-prefix-button" class="ui right button">Search</button>
+            </div>
+          </div>
+          <p>Tip: You can search for multiple prefixes by separating them with comma (,)<br/>
+            Templates:
+            <a onclick="prefixTemplate('2')">3-identical</a>
+            <a onclick="prefixTemplate('3')">3-word</a>
+            <a onclick="prefixTemplate('4')">4-word</a>
+            <a onclick="prefixTemplate('all')">All</a>
+          </p>
+          <div class="ui raised segment" style="display: none" id="prefix-status"></div>
+        </div>
+      </form>
+
+    </div>
+</body>
+<style>
+.container {
+  margin-top: 40px;
+  text-align: center;
+  padding-bottom: 50px;
+}
+
+#kadena-form {
+  margin: auto;
+  text-align: center;
+  max-width: 640px;
+}
+a:hover {
+  cursor:pointer;
+}
+.ui.dimmer {
+  background-color: rgba(0,0,0,.50);
+}
+.ui.dimmer .content {
+  background-color: rgba(0,0,0,.9);
+  padding: 7px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+.rel {
+  position: relative;
+}
+.segment {
+  word-break: break-word;
+}
+.topright {
+  position: absolute;
+  top: 5px;
+  right: 0;
+}
+</style>
+</html>
