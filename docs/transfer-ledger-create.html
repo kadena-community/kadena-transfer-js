@@ -8,6 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/pact-lang-api@4.1.2/pact-lang-api-global.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
     <script src="../util/ledger-os.js"></script>
+    <script src="../util/ledger.js"></script>
     <script src="../util/httptransp.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -97,6 +98,7 @@
           $(`.ui .segment .field`).attr("hidden", true)
           $(`.ui .segment #${e.target.id}-input`).attr("hidden", false)
         });
+
         //Activate Dropdown
         $('.dropdown')
           .dropdown({ selectOnKeydown: false });
@@ -125,37 +127,6 @@
 
       // INITIATION FUNCTIONS
       window.addEventListener('load', function (event) {
-        let prevTimeout;
-        document.getElementById("keyIdDropdown").addEventListener("change", async function(e){
-          // debounce - when typing we sometimes get multiple triggers
-          if (prevTimeout)
-            clearTimeout(prevTimeout);
-          prevTimeout = setTimeout(() => {
-            prevTimeout = null;
-            getPublicKeyFromLedger()
-          }, 200);
-        })
-        document.getElementById("getSig-button").addEventListener("click", async function(e){
-          dimBody("Waiting for ledger signature");
-          await signWithLedger();
-          $("body").dimmer("hide");
-        })
-        document.getElementById("getBlindSig-button").addEventListener("click", async function(e){
-          dimBody("Waiting for ledger signature");
-          await signHashWithLedger();
-          $("body").dimmer("hide");
-        })
-
-        document.getElementById("getPubkey-button").addEventListener("click", async function(e){
-          await getPublicKeyFromLedger();
-        })
-
-        document.getElementById("verifyAddress-button").addEventListener("click", async function(e){
-          // Dont dim, let the user see the address on web
-          setStatus('Check your ledger to confirm your address');
-          await verifyAddressOnLedger();
-          setStatus('');
-        })
 
         document.getElementById("network-0").addEventListener("click", async function(e){
           reset();
@@ -183,14 +154,16 @@
           reset();
         })
 
+        document.getElementById("getBlindSig-button").addEventListener("click", async function(e){
+          dimBody("Waiting for ledger signature");
+          await signHashWithLedger();
+          $("body").dimmer("hide");
+        })
+
         document.getElementById("showBlindSigning-button").addEventListener("click", async function(e){
           document.getElementById("showBlindSigning-button").hidden = true;
           document.getElementById("kadena-blind-sign-form-top").hidden = false;
         })
-
-        if (navigator.userAgent.indexOf(' Firefox') > -1) {
-          setError('It seems that you are using Firefox, which does not support the technology required to interact with a Ledger via this page. Try using a different browser.');
-        }
 
       });
 
@@ -208,19 +181,6 @@
       function dimBody(msg){
         $("body").dimmer({closable:true}).dimmer("show");
         $(".dimmer").html("<div class='content'> <h3> " + msg + "</h3></div>");
-      }
-
-      async function getLedger(){
-        if (!window.ledger) {
-          var transp = await window.TranspWeb.create();
-          window.ledger = new window.Kadena(transp);
-        }
-      }
-
-      const BIP32_PATH_PREFIX = "m/44'/626'/0'/0/";
-      function getPath() {
-        const {keyId} = getInputs();
-        return `${BIP32_PATH_PREFIX}${keyId}"`;
       }
 
       async function signWithLedger(){
@@ -318,44 +278,7 @@
         document.getElementById("publicKey").value = [ publicKey ];
         document.getElementById("fromAccount").innerText = publicKey ? `k:${publicKey}` : '';
         window.pubKey = publicKey;
-        let title = document.getElementById("getPubkey-button");
-        let content = document.getElementById("getPubkey-content");
-        title.classList.add('active')
-        content.classList.add('active')
-      }
-
-      function bufferToHex (buffer) {
-        return [...new Uint8Array (buffer)]
-          .map (b => b.toString (16).padStart (2, "0"))
-          .join ("");
-      }
-
-      async function getPublicKeyFromLedger(){
-        dimBody("Waiting for ledger public key");
-        setPublicKey('');
-        setStatus('Loading');
-        await getLedger();
-        try {
-          var publicKey = bufferToHex((await window.ledger.getPublicKey(getPath())).publicKey);
-          setPublicKey(publicKey);
-          setStatus();
-        } catch (e) {
-          setStatus('Error: '+e.message);
-          setError("Could not get the Ledger Account Name " + e.message)
-        }
-        $("body").dimmer("hide");
-      }
-
-      async function verifyAddressOnLedger(){
-        await getLedger();
-        try {
-          var path = getPath();
-          var publicKey = bufferToHex((await window.ledger.verifyAddress(path)).publicKey);
-          setPublicKey(publicKey);
-        } catch (e) {
-          console.error(e);
-          setError("Could not get the Ledger Account Name "+e.message);
-        }
+        showAccordion(document.getElementById("getPubkey-button").parentNode);
       }
 
       function reset(){
@@ -657,6 +580,7 @@
 
       const getInputs = function (){
         return {
+          legacyDerivationMode: getLegacyDerivationModeFromLocation(),
           keyId: document.getElementById("keyId").value,
           fromAccount: document.getElementById("fromAccount").innerText,
           fromChainId: document.getElementById("fromChainId").value,
@@ -719,35 +643,7 @@
           account works as expected.
         </p>
       </div>
-      <div>
-        <div class="ui accordion">
-          <div class="title" id="getPubkey-button">
-            <i class="dropdown icon"></i>
-            Change/Verify Ledger Account Name
-          </div>
-          <div class="content" id="getPubkey-content">
-            <div class="ui message" style="margin-bottom:10px">
-              <div>
-                <div id="keyIdDropdown" class="ui floating small dropdown labeled search icon button">
-                  <input type="hidden" id="keyId" value="0" />
-                  <i class="key icon"></i>
-                  <div class="text">0</div>
-                  <div class="menu" id="ledger-key-menu">
-                  </div>
-                </div>
-                <i style="margin-right: -20px; margin-left: 5px" class="info icon small popup-target" data-content="Change ledger key. If unsure, leave the default (zero)."></i>
-              </div>
-
-              <p style="font-weight:bold;" id="fromAccount"></p>
-              <p style="font-weight:bold;" id="status"></p>
-
-              <div class="ui button" id="verifyAddress-button">
-                <i class="eye icon"></i>
-                <span>Verify</span>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div class="ui accordion" id="change-ledger-key-accordion">
       </div>
       <form id ="kadena-form" class="ui form" autocomplete="off">
         <div class="field">
@@ -886,6 +782,7 @@
           <p>
             <b>Signing hashes from untrusted sources can lead to loss of funds.</b><br />
             Transaction hash signing (Blind Signing) feature is intended only for advanced users.<br/>
+            <b>You must ALWAYS validate that the hash you are signing matches the expected transaction.</b><br />
             This function requires 'Blind Signing' to be enabled on the Kadena Ledger App.
           </p>
         </div>
