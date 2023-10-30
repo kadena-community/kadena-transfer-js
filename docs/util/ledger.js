@@ -70,13 +70,12 @@ async function getLedger() {
     }
 }
 
-const BIP32_PATH_PREFIX = "";
 function getPath() {
     const { keyId, legacyDerivationMode } = getInputs();
     if (legacyDerivationMode) {
         return `m/44'/626'/0'/0/${keyId}`;
     }
-    return `m/44'/626'/${keyId}'`;
+    return `m/44'/626'/${keyId}'/0/0`;
 }
 
 function bufferToHex (buffer) {
