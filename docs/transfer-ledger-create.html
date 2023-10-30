@@ -17,12 +17,6 @@
       //Form Validation
       $(document).ready(function(){
 
-        // create 1000 entries under "ledger key"
-        const m = $('#ledger-key-menu');
-        for(let i=0; i<=1000; i++) {
-          m.append(`<div class="item" data-value="${i}">${i}</div>`);
-        }
-
         // custom form validation rule
         $.fn.form.settings.rules.validSig = function(sig) {
           return sig.length === 128 && validateSig(sig);
@@ -99,20 +93,6 @@
           $(`.ui .segment #${e.target.id}-input`).attr("hidden", false)
         });
 
-        //Activate Dropdown
-        $('.dropdown')
-          .dropdown({ selectOnKeydown: false });
-
-        $('.popup-target')
-          .popup({ closable: false});
-
-        $('.message .close')
-          .on('click', function() {
-            $(this)
-              .closest('.message')
-              .transition('fade')
-            ;
-          });
       });
 
       const mkReq = (cmd) => {

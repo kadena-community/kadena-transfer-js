@@ -6,6 +6,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
   <script src="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.js"></script>
   <script src="../util/ledger-os.js"></script>
+  <script src="../util/ledger.js"></script>
   <script src="../util/httptransp.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -19,7 +20,7 @@
     function toggleSearch(name) {
       if (!searching) return start(name);
       const wasSearching = searching;
-      stop(searching);
+      stopSearch(searching);
       if (wasSearching === name) return;
       setTimeout(() => toggleSearch(name), 1100);
     }
@@ -32,11 +33,16 @@
       }
     }
 
-    function stop(name) {
+    function stopSearch(name) {
       switch(name) {
         case 'specific': return stopSearchSpecific();
         case 'prefix': return stopSearchPrefix();
-        default: console.log('Unknown job to stop:', name);
+        case 'all':
+          stopSearchPrefix();
+          stopSearchSpecific();
+          break;
+        default:
+          console.error('Unknown job to stop:', name);
       }
     }
 
@@ -80,24 +86,6 @@
       }
     }
 
-    const BIP32_PATH_PREFIX = "m/44'/626'/0'/0/";
-    function getPath(keyId) {
-      return `${BIP32_PATH_PREFIX}${keyId}"`;
-    }
-
-    function bufferToHex (buffer) {
-      return [...new Uint8Array (buffer)]
-        .map (b => b.toString (16).padStart (2, "0"))
-        .join ("");
-    }
-
-    async function getLedger(){
-      if (!window.ledger) {
-        var transp = await window.TranspWeb.create();
-        window.ledger = new window.Kadena(transp);
-      }
-    }
-
     function copyPrefixResults(elem) {
       const str = res.map(([n, key]) => `Key ${n}: ${key}`).join('\n');
       navigator.clipboard.writeText(str);
@@ -107,30 +95,33 @@
       icon.classList.add("checkmark");
     }
 
+    // used to copy keys
     let res = [];
     async function search(name, key, pred, once = true) {
+      res = [];
       searching = name;
       let i = -1;
       await getLedger();
       let suffix = '';
+      let legacyStr = getLegacyDerivationModeFromLocation() ? '(Legacy) ' : '';
       while(searching) {
         i++;
         try {
           const shortKey = key.slice(0, 6)+'..'+key.slice(-6);
-          setStatus(name, `Searching for:<br/>${key}<br/><br/>Looking in slot: ${i}<div class="rel">${suffix}</div>`, suffix ? 'green' : 'yellow');
+          setStatus(name, `${legacyStr}Searching for:<br/>${key}<br/><br/>Looking in slot: ${i}<div class="rel">${suffix}</div>`, suffix ? 'green' : 'yellow');
           const publicKey = bufferToHex((await window.ledger.getPublicKey(getPath(i))).publicKey);
           // not the key we are looking for. continue
           if (!pred(publicKey)) continue;
           // found and we only care about one key. finish it
           if (once) {
             searching = false;
-            setStatus(name, `<strong>Found</strong><br/><strong>Slot: ${i}</strong><br/>Path: ${getPath(i)}<br/>Key: ${publicKey}`, 'green');
+            setStatus(name, `<strong>Found</strong><br/><strong>${legacyStr}Slot: ${i}</strong><br/>Path: ${getPath(i)}<br/>Key: ${publicKey}`, 'green');
             reset();
             break;
           }
           // found but we keep looking
           suffix = suffix ? suffix : '<div class="ui divider"></div><strong style="text-decoration: underline">Found</strong><br/><button onclick="copyPrefixResults(this)" type="button" id="copybtn" class="circular topright ui icon button"><i class="icon copy"></i></button>';
-          suffix += `<strong>Slot ${i}</strong> (${getPath(i)})<br/>${publicKey}<br/><br/>`;
+          suffix += `<strong>${legacyStr}Slot ${i}</strong> (${getPath(i)})<br/>${publicKey}<br/><br/>`;
           res.push([i, publicKey]);
         } catch(e) {
           searching = false;
@@ -241,6 +232,17 @@
             <a onclick="prefixTemplate('all')">All</a>
           </p>
           <div class="ui raised segment" style="display: none" id="prefix-status"></div>
+        </div>
+
+        <div class="ui segment">
+          <h4 class="ui header">Options</h4>
+          <div class="ui message">
+            <p>Key derivation has changed since the first version of this tool.</p>
+            <p><strong>If you used this tool to access accounts in October 2023:</strong></p>
+            <p>You can enable <strong>Legacy mode</strong> which will allow you to access your keys.</p>
+            <p><i>Note: The default (zero) account is not affected by this change.</i></p>
+            <button type="button" class="ui button" id="legacyDerivation-btn">Legacy mode OFF</button>
+          </div>
         </div>
       </form>
 

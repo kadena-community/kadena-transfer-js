@@ -21,12 +21,14 @@ function hideAccordion(node) {
 }
 
 async function onLoadDerivationMode() {
-    const { legacyDerivationMode } = getInputs();
+    const legacyDerivationMode = getLegacyDerivationModeFromLocation();
     if (legacyDerivationMode) {
         const outer = document.getElementById('getPubkey-button');
+        if (outer)
+            showAccordion(outer.parentNode);
         const inner = document.getElementById('showDerivationOption-button');
-        showAccordion(outer.parentNode);
-        showAccordion(inner.parentNode);
+        if (inner)
+            showAccordion(inner.parentNode);
         updateDerivationButton();
         await getPublicKeyFromLedger();
     }
@@ -37,7 +39,7 @@ function getLegacyDerivationModeFromLocation() {
 }
 
 function updateDerivationButton() {
-    const { legacyDerivationMode } = getInputs();
+    const legacyDerivationMode = getLegacyDerivationModeFromLocation();
     const btn = document.getElementById('legacyDerivation-btn');
     if (legacyDerivationMode) {
         btn.classList.add('orange');
@@ -49,7 +51,7 @@ function updateDerivationButton() {
 }
 
 async function switchDerivationMode() {
-    const { legacyDerivationMode } = getInputs();
+    const legacyDerivationMode = getLegacyDerivationModeFromLocation();
     const location = new URL(window.location.href);
     if (!legacyDerivationMode) {
         location.searchParams.set('derivation', 'legacy');
@@ -60,7 +62,14 @@ async function switchDerivationMode() {
         window.history.pushState(null, null, location.toString());
     }
     updateDerivationButton();
-    await getPublicKeyFromLedger();
+    // transfer/signing page
+    if (window.dimBody) {
+        await getPublicKeyFromLedger();
+    }
+    // search page
+    if (window.stopSearch) {
+        stopSearch('all');
+    }
 }
 
 async function getLedger() {
@@ -70,8 +79,10 @@ async function getLedger() {
     }
 }
 
-function getPath() {
-    const { keyId, legacyDerivationMode } = getInputs();
+function getPath(explicitKeyId) {
+    // explicit used by search, transfer/sign have inputs
+    const keyId = explicitKeyId !== undefined ? explicitKeyId : getInputs().keyId;
+    const legacyDerivationMode = getLegacyDerivationModeFromLocation();
     if (legacyDerivationMode) {
         return `m/44'/626'/0'/0/${keyId}`;
     }
@@ -113,7 +124,11 @@ async function verifyAddressOnLedger(){
 }
 
 function renderLedgerAccountChangeModal(elemId = 'change-ledger-key-accordion') {
-    document.getElementById(elemId).innerHTML = `
+    const elem = document.getElementById(elemId);
+    if (!elem) {
+        return;
+    }
+    elem.innerHTML = `
         <div class="title" id="getPubkey-button">
           <i class="dropdown icon"></i>
           Change/Verify Ledger Account
@@ -128,7 +143,7 @@ function renderLedgerAccountChangeModal(elemId = 'change-ledger-key-accordion') 
                 <div class="menu" id="ledger-key-menu">
                 </div>
               </div>
-              <i style="margin-right: -20px; margin-left: 5px" class="info icon small popup-target" data-content="Change ledger key. If unsure, leave the default (zero)."></i>
+              <i style="margin-right: -20px; margin-left: 5px" class="info icon small popup-target" data-content="Change ledger key. You can use any number (beyond the pre-defined 100). If unsure, leave the default (zero)."></i>
             </div>
 
             <p style="font-weight:bold;" id="fromAccount"></p>
@@ -146,11 +161,11 @@ function renderLedgerAccountChangeModal(elemId = 'change-ledger-key-accordion') 
               </div>
               <div class="content" id="showDerivationOption-button">
                 <div class="ui message">
-                  <p>The first iteration of this tool derived account keys differently.</p>
+                  <p>Key derivation has changed since the first version of this tool.</p>
                   <p><strong>If you used this tool to access accounts in October 2023:</strong></p>
                   <p>You can enable <strong>Legacy mode</strong> which will allow you to access your keys.</p>
                   <p><i>Note: The default (zero) account is not affected by this change.</i></p>
-                  <button class="ui button" id="legacyDerivation-btn">Legacy mode OFF</button>
+                  <button type="button" class="ui button" id="legacyDerivation-btn">Legacy mode OFF</button>
                 </div>
               </div>
             </div>
@@ -159,11 +174,18 @@ function renderLedgerAccountChangeModal(elemId = 'change-ledger-key-accordion') 
         </div>`;
 }
 
+function addEventListenerMaybe(elementId, eventName, callback) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.addEventListener(eventName, callback);
+    }
+}
+
 window.addEventListener('load', function (event) {
     renderLedgerAccountChangeModal();
 
     let prevTimeout;
-    document.getElementById("keyIdDropdown").addEventListener("change", async function(e){
+    addEventListenerMaybe("keyIdDropdown", "change", async function(e){
         // debounce - when typing we sometimes get multiple triggers
         if (prevTimeout)
             clearTimeout(prevTimeout);
@@ -173,13 +195,13 @@ window.addEventListener('load', function (event) {
         }, 200);
     });
 
-    document.getElementById("getSig-button").addEventListener("click", async function(e){
+    addEventListenerMaybe("getSig-button", "click", async function(e){
         dimBody("Waiting for ledger signature");
         await signWithLedger();
         $("body").dimmer("hide");
     });
 
-    document.getElementById("getPubkey-button").addEventListener("click", async function(e){
+    addEventListenerMaybe("getPubkey-button", "click", async function(e){
         const content = document.getElementById("getPubkey-content");
         if (content.classList.contains('active')) {
             hideAccordion(content.parentNode);
@@ -187,32 +209,60 @@ window.addEventListener('load', function (event) {
             showAccordion(content.parentNode);
             await getPublicKeyFromLedger();
         }
-    })
+    });
 
-    document.getElementById("verifyAddress-button").addEventListener("click", async function(e){
+    addEventListenerMaybe("verifyAddress-button", "click", async function(e){
         // Dont dim, let the user see the address on web
         setStatus('Check your ledger to confirm your address');
         await verifyAddressOnLedger();
         setStatus('');
-    })
+    });
 
-    document.getElementById("showDerivationOption-button").addEventListener("click", async function(e){
+    addEventListenerMaybe("showDerivationOption-button", "click", async function(e){
         const content = document.getElementById("showDerivationOption-button");
         if (content.classList.contains('active')) {
             hideAccordion(content.parentNode);
         } else {
             showAccordion(content.parentNode);
         }
-    })
+    });
 
-    document.getElementById("legacyDerivation-btn").addEventListener("click", async function(e){
+    addEventListenerMaybe("legacyDerivation-btn", "click", async function(e){
         switchDerivationMode();
-    })
+    });
 
-    if (navigator.userAgent.indexOf(' Firefox') > -1) {
+    if (navigator.userAgent.indexOf(' Firefox') > -1 && setError) {
         setError('It seems that you are using Firefox, which does not support the technology required to interact with a Ledger via this page. Try using a different browser.');
     }
 
     onLoadDerivationMode();
 
 });
+
+//Form Validation
+$(document).ready(function(){
+
+    // create 1000 entries under "ledger key"
+    const m = $('#ledger-key-menu');
+    if (m.length) {
+        for(let i=0; i<100; i++) {
+            m.append(`<div class="item" data-value="${i}">${i}</div>`);
+        }
+    }
+    
+    //Activate Ledger Dropdown
+    $('.dropdown')
+        .dropdown({ selectOnKeydown: false, allowAdditions: true, });
+
+    $('.popup-target')
+        .popup({ closable: false});
+
+    $('.message .close')
+        .on('click', function() {
+            $(this)
+                .closest('.message')
+                .transition('fade')
+            ;
+        });
+});
+

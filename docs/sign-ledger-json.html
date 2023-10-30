@@ -11,32 +11,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <script>
-
-      //Form Validation
-      $(document).ready(function(){
-
-        // create 1000 entries under "ledger key"
-        const m = $('#ledger-key-menu');
-        for(let i=0; i<=1000; i++) {
-          m.append(`<div class="item" data-value="${i}">${i}</div>`);
-        }
-
-        //Activate Ledger Dropdown
-        $('.dropdown')
-          .dropdown({ selectOnKeydown: false });
-
-        $('.popup-target')
-          .popup({ closable: false});
-
-        $('.message .close')
-          .on('click', function() {
-            $(this)
-              .closest('.message')
-              .transition('fade')
-            ;
-          });
-      });
-
       const mkReq = (cmd) => {
         return {
           headers: {
