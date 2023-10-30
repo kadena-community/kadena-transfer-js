@@ -107,16 +107,20 @@
         }
       }
 
-      function showSubmit(message = '') {
+      function showSubmit() {
         const submit = document.getElementById('submit-button');
         submit.classList.remove('disabled');
         submit.classList.add('primary');
       }
 
-      function resetSubmit(message) {
+      function disableSubmit() {
         const submit = document.getElementById('submit-button');
         submit.classList.add('disabled');
         submit.classList.remove('primary');
+      }
+
+      function resetSubmit(message) {
+        disableSubmit();
         const notice = document.getElementById('submit-notice');
         if (message) {
           notice.style.display = 'block';
@@ -153,6 +157,7 @@
         setStatus('');
         clearError();
         document.getElementById('signature').value = '';
+        document.getElementById('json').value = '';
         document.getElementById('getSig-button').classList.remove('disabled');
         document.getElementById('getSig-button').innerText = 'Sign with Ledger';
         document.getElementById('status-box').classList.add("hidden")
@@ -186,6 +191,7 @@
       }
 
       async function submit() {
+        disableSubmit();
         clearError();
         const { chainId } = cmd.meta;
         const { host, networkId } = getNode(chainId);
