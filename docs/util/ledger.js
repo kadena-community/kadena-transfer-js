@@ -237,32 +237,30 @@ window.addEventListener('load', function (event) {
 
     onLoadDerivationMode();
 
-});
+    //Form Validation
+    $(document).ready(function(){
 
-//Form Validation
-$(document).ready(function(){
-
-    // create 1000 entries under "ledger key"
-    const m = $('#ledger-key-menu');
-    if (m.length) {
-        for(let i=0; i<100; i++) {
-            m.append(`<div class="item" data-value="${i}">${i}</div>`);
+        // create 1000 entries under "ledger key"
+        const m = $('#ledger-key-menu');
+        if (m.length) {
+            for(let i=0; i<100; i++) {
+                m.append(`<div class="item" data-value="${i}">${i}</div>`);
+            }
         }
-    }
-    
-    //Activate Ledger Dropdown
-    $('.dropdown')
-        .dropdown({ selectOnKeydown: false, allowAdditions: true, });
 
-    $('.popup-target')
-        .popup({ closable: false});
+        //Activate Ledger Dropdown
+        $('.dropdown')
+            .dropdown({ selectOnKeydown: false, allowAdditions: true, });
 
-    $('.message .close')
-        .on('click', function() {
-            $(this)
-                .closest('.message')
-                .transition('fade')
-            ;
-        });
+        $('.popup-target')
+            .popup({ closable: false});
+
+        $('.message .close')
+            .on('click', function() {
+                $(this)
+                    .closest('.message')
+                    .transition('fade')
+                ;
+            });
+    });
 });
-
