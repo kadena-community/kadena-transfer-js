@@ -636,6 +636,8 @@ function validateServer() {
         console.log(err);
         setError(err);
       }
+
+      setUrlParam('network', event.target.value);
     },
     false,
   );
@@ -670,6 +672,8 @@ function validatePact() {
         console.log(err);
         setError(err);
       }
+
+      setUrlParam('requestKey', event.target.value);
     },
     false,
   );
@@ -739,6 +743,9 @@ function isAccountEligibleForGasPayment() {
 window.addEventListener(
   'load',
   async function () {
+    fillNetworkIdFromQueryString();
+    fillRequestKeyFromQueryString();
+
     State.server = State.server ? State.server : 'api.chainweb.com';
     State.networkId = State.networkId ? State.networkId : 'mainnet01';
     State.requestKey = State.requestKey ? State.requestKey : '';
@@ -1032,4 +1039,39 @@ function makeRawRequestInit(stringBody) {
     method: 'POST',
     body: stringBody,
   };
+}
+
+function fillNetworkIdFromQueryString() {
+  const network = getParameterByName('network');
+  if (network) {
+    document.getElementById('server').value = network;
+    State.server = network;
+  }
+}
+
+function fillRequestKeyFromQueryString() {
+  const requestKey = getParameterByName('requestKey');
+  if (requestKey) {
+    document.getElementById('pact-id').value = requestKey;
+    State.requestKey = requestKey;
+  }
+}
+
+function getParameterByName(name, url = window.location.href) {
+  name = name.replace(/[\[\]]/g, '\\$&');
+  const regex = new RegExp(`[?&]${name}(=([^&#]*)|&|#|$)`);
+  const results = regex.exec(url);
+  if (!results) return null;
+  if (!results[2]) return '';
+  return decodeURIComponent(results[2].replace(/\+/g, ' '));
+}
+
+function setUrlParam(key, value) {
+  const urlParams = new URLSearchParams(window.location.search);
+  urlParams.set(key, value);
+  window.history.replaceState(
+    {},
+    '',
+    `${window.location.pathname}?${urlParams}`,
+  );
 }
