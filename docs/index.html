@@ -40,6 +40,16 @@
           download(pub, pubName, "text/plain;charset=utf-8");
       }, false);
 
+      function redirectToNewFinisher() {
+
+        // On the 31st of January, 14:00 UTC, the old finisher will be deprecated.
+        const targetDate = new Date(Date.UTC(2024, 0, 31, 14));
+
+        const target = Date.now() < targetDate ? "xchain.html" : "https://tools.kadena.io/transactions/cross-chain-transfer-finisher";
+
+        window.location.href = target;
+      }
+
     </script>
 </head>
 <body>
@@ -50,9 +60,7 @@
           <div>
             <a href="transfer-create.html"><button id="submit-button" class="ui primary button">Transfer</button></a>
             <a href="ledger.html"><button id="transfer-button" class="ui primary button">Ledger Tools</button></a>
-            <a href="xchain.html">
-              <button id="xchain-button" class="ui primary button">Finish Cross Chain Transfer</button>
-            </a>
+            <button id="xchain-button" onclick="redirectToNewFinisher()" class="ui primary button">Finish Cross Chain Transfer</button>
           </div>
           <div style="margin-top:10px;">
             <a href="https://balance.chainweb.com"><button class="ui primary button">Check Account Balance</button></a>
