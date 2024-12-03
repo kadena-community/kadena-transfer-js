@@ -422,7 +422,7 @@ async function listen() {
         document.getElementById('status-message').textContent =
           'TRANSFER FAILED with error';
         document.getElementById('status-error').textContent = JSON.stringify(
-          res.result.error.message,
+          res.result.error.message || res.result.error.errorMsg,
         );
         window.localStorage.removeItem('xchain-request-key');
       }
@@ -440,10 +440,12 @@ async function finishXChain() {
           makeRawRequestInit(signedTransaction),
         ).then(r => r.json());
         if (
-          testLocal.result.status === 'failure' &&
-          testLocal.result.error.message.includes('pact completed')
+          (testLocal.result.status === 'failure' &&
+            testLocal.result.error.message?.includes('pact completed')) ||
+          (testLocal.result.status === 'failure' &&
+            testLocal.result.error.errorMsg?.includes('pact completed'))
         ) {
-          setError(testLocal.result.error.message);
+          setError(testLocal.result.error.message || testLocal.result.error.errorMsg);
           return;
         }
 
@@ -502,10 +504,14 @@ async function finishXChain() {
           makeRawRequestInit(JSON.stringify(c.cmds[0])),
         ).then(r => r.json());
         if (
-          testLocal.result.status === 'failure' &&
-          testLocal.result.error.message.includes('pact completed')
+          (testLocal.result.status === 'failure' &&
+            testLocal.result.error.message?.includes('pact completed')) ||
+          (testLocal.result.status === 'failure' &&
+            testLocal.result.error.errorMsg?.includes('pact completed'))
         ) {
-          setError(testLocal.result.error.message);
+          setError(
+            testLocal.result.error?.message || testLocal.result.error?.errorMsg,
+          );
           return;
         }
       } catch (e) {
@@ -699,8 +705,11 @@ function isAccountEligibleForGasPayment() {
   if (State.gasPayerAccountDetails.result.status === 'failure') {
     // an error occurrred
     if (
-      State.gasPayerAccountDetails.result.error.message.includes(
+      State.gasPayerAccountDetails.result.error.message?.includes(
         'row not found',
+      ) ||
+      State.gasPayerAccountDetails.result.error.errorMsg?.includes(
+        'No value found in table',
       )
     ) {
       setError(
