@@ -64,12 +64,16 @@
           const txn = window.txn = JSON.parse(json);
           const cmd = window.cmd = JSON.parse(txn.cmd);
           const pubKeys = cmd.signers.map(({pubKey}) => pubKey);
-          let sigIndex = pubKeys.indexOf(pubKey);
+          if(!window.pubKey){
+            throw new Error("No public key found. Please connect your Ledger, click 'Change/Verify Ledger Account' and try again.");
+          }
+          let sigIndex = pubKeys.indexOf(window.pubKey);
           if (sigIndex === -1) {
             throw new Error("Nothing to sign! Your account was not in found in cmd.signers[]. Do you need to select a different account?");
           }
 
           const bufferCmd = new TextEncoder().encode(txn.cmd);
+          // dimBody("Please confirm the transaction on your Ledger device.");
           const { signature: sigBuffer } = await window.ledger.signTransaction(path, bufferCmd);
           const signature = sigBuffer.toString('hex');
 
@@ -79,14 +83,45 @@
           document.getElementById('copy-button').classList.remove('disabled');
           document.getElementById('signature').scrollIntoView();
 
-          if (!txn.sigs) {
-            txn.sigs = [];
-          } else if (typeof txn.sigs === "object" && !Array.isArray(txn.sigs)) {
-            txn.sigs = cmd.signers.map(({ pubKey }) => ({ sig: txn.sigs[pubKey] }));
+          // sigs can either be Array<string> or Array<{pubKey: string, sig?: string}> or Record<string, string | null> (pubKey -> sig)
+          if(Array.isArray(txn.sigs)){
+            // Array<string | null> | Array<{pubKey: string, sig?: string}>
+              if(txn.sigs[0] !== null && typeof txn.sigs[0] ==='object'){
+                // Array<{pubKey: string, sig?: string}>
+                txn.sigs[sigIndex].sig = signature;
+              } else {
+                // Array<string | null>
+                txn.sigs[sigIndex] = signature;
+              }
+          } else {
+            // Record<string, string | null>
+            txn.sigs[window.pubKey] = signature;
           }
-          txn.sigs[sigIndex] = { sig: signature };
 
-          const numCollectedSigs = window.txn.sigs.filter(({sig}) => !!sig).length;
+          // if (!txn.sigs) {
+          //   txn.sigs = [];
+          // } else if (typeof txn.sigs === "object" && !Array.isArray(txn.sigs)) {
+          //   txn.sigs = cmd.signers.map(({ pubKey }) => ({ sig: txn.sigs[pubKey] }));
+          // }
+          // txn.sigs[sigIndex] = { sig: signature };
+
+          let numCollectedSigs = undefined;
+
+          // sigs can either be Array<string> or Array<{pubKey: string, sig?: string}> or Record<string, string | null> (pubKey -> sig)
+          if (Array.isArray(txn.sigs)) {
+            // Array<string | null> | Array<{pubKey: string, sig?: string}>
+              if(txn.sigs[0] !== null && typeof txn.sigs[0] ==='object'){
+                // Array<{pubKey: string, sig?: string}>
+                numCollectedSigs = txn.sigs.filter(({ sig }) => sig).length;
+              } else {
+                // Array<string | null>
+                numCollectedSigs = txn.sigs.filter(Boolean).length;
+              }
+          } else {
+            // Record<string, string | null>
+            numCollectedSigs = Object.values(txn.sigs).filter(Boolean).length;
+          }
+
           if (numCollectedSigs === cmd.signers.length) {
             showSubmit();
           } else {
