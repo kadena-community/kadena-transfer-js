@@ -127,6 +127,7 @@
           } else {
             resetSubmit('Note: one or more signatures missing. Submit disabled.');
           }
+          setOpenInChainweaver(JSON.stringify(txn, null, 2));
           setSuccess(`Signed! Your signature:`);
           disableFields();
         } catch (e) {
@@ -319,6 +320,13 @@
         } else return false;
       }
 
+      function setOpenInChainweaver(msg){
+        //base64 encode and set link of id `open-in-chainweaver` to `https://wallet.kadena.io/sig-builder?transaction=${msg}`
+        const encoded = btoa(msg);
+        const openInChainweaver = document.getElementById('open-in-chainweaver');
+        openInChainweaver.href = `https://wallet.kadena.io/sig-builder?transaction=${encoded}`;
+      }
+
 </script>
 </head>
 <body>
@@ -365,6 +373,13 @@
           <p id="status-lookup">Check your transaction: <br/><a id="status-link"/></a></p>
         </div>
         <br/>
+        <a
+          id="open-in-chainweaver"
+          target="_blank"
+          href="https://wallet.kadena.io/sig-builder?transaction="
+        >
+          Open in Chainweaver v3 Beta
+        </a>
         <div id="submit-notice" style="display: none" class="ui center orange message"></div>
         <button type="button" id="submit-button" class="ui disabled button">Submit Transaction</button>
         <div type="text" id="publicKey" hidden /> </div>
