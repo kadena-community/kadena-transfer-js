@@ -445,7 +445,9 @@ async function finishXChain() {
           (testLocal.result.status === 'failure' &&
             testLocal.result.error.errorMsg?.includes('pact completed'))
         ) {
-          setError(testLocal.result.error.message || testLocal.result.error.errorMsg);
+          setError(
+            testLocal.result.error.message || testLocal.result.error.errorMsg,
+          );
           return;
         }
 
@@ -585,10 +587,16 @@ function setError(msg) {
   document.getElementById('acct-err').classList.remove('hidden');
   document.getElementById('kadena-form').setAttribute('class', 'ui form error');
 }
-
 function setSigData(msg) {
   const sigDataTextarea = document.getElementById('sig-data');
   sigDataTextarea.value = msg;
+}
+
+function setOpenInChainweaver(msg){
+  //base64 encode and set link of id `open-in-chainweaver` to `https://wallet.kadena.io/sig-builder?transaction=${msg}`
+  const encoded = btoa(msg);
+  const openInChainweaver = document.getElementById('open-in-chainweaver');
+  openInChainweaver.href = `https://wallet.kadena.io/sig-builder?transaction=${encoded}`;
 }
 
 function sigData() {
@@ -736,7 +744,11 @@ function isAccountEligibleForGasPayment() {
     // error state
     if (!isBalanceSufficient) {
       setError(
-        `Balance of ${State.sender} is not sufficient ${State.gasPayerAccountDetails.result.data.balance}`,
+        `Balance of ${
+          State.sender
+        } is not sufficient ${getBalanceOrBalanceDecimal(
+          State.gasPayerAccountDetails.result.data.balance,
+        )}`,
       );
     } else if (!isSingleSig) {
       setError(
@@ -932,6 +944,7 @@ async function fillSigData() {
 
   c.sigs = keys.getSigsObject();
   setTimeout(() => setSigData(JSON.stringify(c, null, 2)));
+  setTimeout(() => setOpenInChainweaver(JSON.stringify(c, null, 2)));
 }
 
 function isGasStation(res) {
@@ -940,7 +953,9 @@ function isGasStation(res) {
 
 function isBalanceSufficient(gasPrice, gasLimit, res) {
   try {
-    return gasPrice * gasLimit <= res.result.data.balance;
+    return (
+      gasPrice * gasLimit <= getBalanceOrBalanceDecimal(res.result.data.balance)
+    );
   } catch (error) {
     return false;
   }
@@ -1083,4 +1098,8 @@ function setUrlParam(key, value) {
     '',
     `${window.location.pathname}?${urlParams}`,
   );
+}
+
+function getBalanceOrBalanceDecimal(res) {
+  return typeof res === 'object' ? res.decimal : res;
 }

@@ -17,8 +17,9 @@
 
   <body>
     <div class="ui main container">
-      <a href="/"><img src="./kadena-logo.png" class="center" style="height:70px"></a>
-
+      <a href="/">
+        <img src="./kadena-logo.png" class="center" style="height: 70px" />
+      </a>
 
       <h1>Finish Cross Chain Transfer</h1>
       <form id="kadena-form" class="ui form">
@@ -93,6 +94,13 @@
             <button id="click-to-copy" class="ui secondary basic button">
               Click To Copy
             </button>
+            <a
+              id="open-in-chainweaver"
+              target="_blank"
+              href="https://wallet.kadena.io/sig-builder?transaction="
+            >
+              Open in Chainweaver v3 Beta
+            </a>
           </div>
 
           <div id="signed-transaction-wrapper" class="ui field hidden">
